@@ -8,13 +8,13 @@ using N_m3u8DL_RE.Common.Resource;
 using N_m3u8DL_RE.Common.Log;
 using System.Text;
 using N_m3u8DL_RE.Common.Util;
-using N_m3u8DL_RE.Processor;
-using N_m3u8DL_RE.Config;
-using N_m3u8DL_RE.Util;
-using N_m3u8DL_RE.DownloadManager;
+using N_m3u8DL_RE.Core.Processor;
+using N_m3u8DL_RE.Core.Config;
+using N_m3u8DL_RE.Core.Util;
+using N_m3u8DL_RE.Core.DownloadManager;
 using N_m3u8DL_RE.CommandLine;
 using System.Net;
-using N_m3u8DL_RE.Enum;
+using N_m3u8DL_RE.Core.Enum;
 
 namespace N_m3u8DL_RE;
 

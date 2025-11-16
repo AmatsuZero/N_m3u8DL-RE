@@ -1,5 +1,5 @@
 ﻿using N_m3u8DL_RE.Common.Util;
-using N_m3u8DL_RE.Entity;
+using N_m3u8DL_RE.Core.Entity;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using System.Collections.Concurrent;

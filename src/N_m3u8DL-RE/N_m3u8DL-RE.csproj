@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0;net9.0-ios</TargetFrameworks>
     <RootNamespace>N_m3u8DL_RE</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- 
@@ -13,14 +13,20 @@
     <Nullable>enable</Nullable>
     <Version>0.5.1</Version>
     <Platforms>AnyCPU;x64</Platforms>
+    <!-- iOS特定配置 -->
+    <!-- RuntimeIdentifier 应该在发布时通过命令行参数指定，而不是硬编码在项目文件中 -->
+    <!-- <RuntimeIdentifier>ios-arm64</RuntimeIdentifier> -->
+    <!-- iOS 不支持 PublishAot，在发布时通过命令行参数禁用 -->
+    <!-- <PublishAot>true</PublishAot> -->
+    <StripSymbols>true</StripSymbols>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\N_m3u8DL-RE.Core\N_m3u8DL-RE.Core.csproj" />
     <ProjectReference Include="..\N_m3u8DL-RE.Parser\N_m3u8DL-RE.Parser.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NiL.JS" Version="2.6.1706" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-rc.2.25502.107" />
   </ItemGroup>
 
