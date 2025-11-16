@@ -159,6 +159,101 @@ git revert <commit-id>  # 回滚到指定提交
 
 ---
 
+## 📱 iOS Library 改造
+
+### ✅ 已完成 iOS Library 打包支持
+
+在架构重构的基础上，进一步将 Core 部分打包为可供外部使用的 iOS Library。
+
+### 改造内容
+
+#### 1. 项目配置更新
+- ✅ **N_m3u8DL-RE.Core**: 添加 NativeAOT 和 iOS Library 支持
+- ✅ **N_m3u8DL-RE.Common**: 支持 `net9.0-ios` 目标框架
+- ✅ **N_m3u8DL-RE.Parser**: 支持 `net9.0-ios` 目标框架
+
+#### 2. 公共 API 接口
+创建了 `PublicAPI/NativeAPI.cs`，提供 C 风格的导出接口：
+- `m3u8dl_init()` - 初始化库
+- `m3u8dl_download()` - 开始下载
+- `m3u8dl_get_progress()` - 获取进度
+- `m3u8dl_cancel()` - 取消下载
+- `m3u8dl_get_version()` - 获取版本
+- `m3u8dl_get_api_version()` - 获取 API 版本
+
+#### 3. 构建脚本
+- ✅ **build-ios-library.sh**: 完整版构建脚本
+  - 支持设备版 (ios-arm64)
+  - 支持模拟器版 (iossimulator-arm64, iossimulator-x64)
+  - 生成标准 XCFramework
+  - 包含头文件和模块映射
+
+- ✅ **build-ios-library-simple.sh**: 简化版构建脚本
+  - 仅构建设备版本
+  - 快速测试用
+
+#### 4. 集成文档
+创建了 `docs/iOS-Library-Integration.md`，包含：
+- 构建说明
+- Xcode 集成步骤
+- Objective-C 使用示例
+- Swift 使用示例
+- API 参考文档
+- 故障排除指南
+
+### 使用方法
+
+#### 构建 iOS Library
+
+```bash
+# 完整版本（推荐）
+./build-ios-library.sh
+
+# 简化版本（快速测试）
+./build-ios-library-simple.sh
+```
+
+#### 集成到 iOS 项目
+
+1. 将生成的 `N_m3u8DL_RE_Core.xcframework` 添加到 Xcode 项目
+2. 在代码中导入头文件：
+   ```objective-c
+   #import <N_m3u8DL_RE_Core/N_m3u8DL_RE_Core.h>
+   ```
+3. 调用 API：
+   ```objective-c
+   m3u8dl_init();
+   m3u8dl_download("https://example.com/playlist.m3u8", "/path/to/output.mp4", callback);
+   ```
+
+详细说明请查看：[iOS Library 集成指南](./docs/iOS-Library-Integration.md)
+
+### 技术特性
+
+- 🚀 **NativeAOT 编译**: 提供原生性能
+- 📦 **XCFramework 格式**: 标准 iOS 库格式
+- 🔧 **多架构支持**: 设备 + 模拟器 (arm64 + x64)
+- 🌐 **C API 接口**: 兼容 Objective-C 和 Swift
+- 📝 **完整文档**: 包含示例代码和 API 参考
+
+### 架构优势
+
+```
+iOS App (Swift/Objective-C)
+    └─→ N_m3u8DL_RE_Core.xcframework
+            └─→ N_m3u8DL-RE.Core (NativeAOT)
+                    ├─→ N_m3u8DL-RE.Common
+                    └─→ N_m3u8DL-RE.Parser
+```
+
+- ✅ 核心功能可在 iOS 应用中直接使用
+- ✅ 无需依赖命令行工具
+- ✅ 原生性能，低内存占用
+- ✅ 支持 Swift 和 Objective-C
+
+---
+
 **重构完成时间**: 2025-11-16  
+**iOS Library 改造完成时间**: 2025-11-16  
 **重构版本**: v0.5.1  
 **状态**: ✅ 成功

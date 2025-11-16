@@ -7,6 +7,19 @@
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <Version>0.5.1</Version>
+    
+    <!-- iOS Library 特定配置 -->
+    <OutputType>Library</OutputType>
+    
+    <!-- 当构建 iOS 目标时启用 NativeAOT -->
+    <PublishAot Condition="'$(TargetFramework)' == 'net9.0-ios'">true</PublishAot>
+    <PublishAotUsingRuntimePack Condition="'$(TargetFramework)' == 'net9.0-ios'">true</PublishAotUsingRuntimePack>
+    
+    <!-- 生成动态库 -->
+    <NativeLib Condition="'$(TargetFramework)' == 'net9.0-ios'">Shared</NativeLib>
+    
+    <!-- 导出符号以供外部调用 -->
+    <IlcExportUnmanagedEntrypoints Condition="'$(TargetFramework)' == 'net9.0-ios'">true</IlcExportUnmanagedEntrypoints>
   </PropertyGroup>
 
   <ItemGroup>

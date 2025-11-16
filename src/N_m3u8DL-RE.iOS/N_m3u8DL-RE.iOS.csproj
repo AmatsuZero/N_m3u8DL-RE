@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-ios</TargetFramework>
+    <RootNamespace>N_m3u8DL_RE.iOS</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <Version>0.5.1</Version>
+    
+    <!-- iOS Library 配置 -->
+    <OutputType>Library</OutputType>
+    
+    <!-- NativeAOT 配置 -->
+    <PublishAot>true</PublishAot>
+    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
+    
+    <!-- 生成动态库 -->
+    <NativeLib>Shared</NativeLib>
+    
+    <!-- 导出符号以供外部调用 -->
+    <IlcExportUnmanagedEntrypoints>true</IlcExportUnmanagedEntrypoints>
+    
+    <!-- 优化设置 -->
+    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+    <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+    
+    <!-- 允许不安全代码 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 引用 Common 和 Parser 项目 -->
+    <ProjectReference Include="..\N_m3u8DL-RE.Common\N_m3u8DL-RE.Common.csproj" />
+    <ProjectReference Include="..\N_m3u8DL-RE.Parser\N_m3u8DL-RE.Parser.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 必要的 NuGet 包 -->
+    <PackageReference Include="NiL.JS" Version="2.6.1706" />
+  </ItemGroup>
+
+</Project>

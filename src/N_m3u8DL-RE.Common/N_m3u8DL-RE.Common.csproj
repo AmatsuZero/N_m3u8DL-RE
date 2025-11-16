@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 	<OutputType>library</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0;net9.0-ios</TargetFrameworks>
     <RootNamespace>N_m3u8DL_RE.Common</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>13.0</LangVersion>

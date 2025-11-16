@@ -369,3 +369,9 @@ FodyWeavers.xsd
 
 # macOS shit
 .DS_Store
+
+# Local .NET SDK (for iOS development)
+.dotnet/
+
+# iOS Library build output
+output/
