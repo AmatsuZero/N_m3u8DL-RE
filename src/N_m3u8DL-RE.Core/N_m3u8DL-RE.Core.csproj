@@ -2,11 +2,27 @@
 
   <PropertyGroup>
     <OutputType>library</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- 支持多目标框架：标准.NET和iOS -->
+    <TargetFrameworks>net10.0;net10.0-ios</TargetFrameworks>
     <RootNamespace>N_m3u8DL_RE.Core</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
+    <!-- iOS平台标识 -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">14.2</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <!-- iOS编译配置（暂时禁用AOT，等workload安装完成后再启用） -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <!-- 暂时注释掉AOT配置 -->
+    <!-- <IsAotCompatible>true</IsAotCompatible> -->
+    <!-- <PublishAot>true</PublishAot> -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+    <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+    <DefineConstants>$(DefineConstants);IOS</DefineConstants>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
