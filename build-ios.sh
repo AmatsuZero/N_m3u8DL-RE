@@ -11,6 +11,7 @@ echo "========================================="
 
 # 项目路径
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DOTNET_CMD="$PROJECT_DIR/.dotnet_local/dotnet"
 CORE_PROJECT="$PROJECT_DIR/src/N_m3u8DL-RE.Core/N_m3u8DL-RE.Core.csproj"
 OUTPUT_DIR="$PROJECT_DIR/build/ios"
 
@@ -22,10 +23,8 @@ mkdir -p "$OUTPUT_DIR"
 # 编译iOS arm64（真机）
 echo ""
 echo "Building for iOS arm64 (Device)..."
-echo "Note: NativeAOT is temporarily disabled. Install iOS workload first:"
-echo "  dotnet workload install ios"
-dotnet publish "$CORE_PROJECT" \
-    -f net10.0-ios \
+$DOTNET_CMD publish "$CORE_PROJECT" \
+    -f net9.0-ios \
     -c Release \
     -r ios-arm64 \
     -o "$OUTPUT_DIR/ios-arm64" \
@@ -34,8 +33,8 @@ dotnet publish "$CORE_PROJECT" \
 # 编译iOS Simulator arm64
 echo ""
 echo "Building for iOS Simulator arm64..."
-dotnet build "$CORE_PROJECT" \
-    -f net10.0-ios \
+$DOTNET_CMD build "$CORE_PROJECT" \
+    -f net9.0-ios \
     -c Release \
     -r iossimulator-arm64 \
     -o "$OUTPUT_DIR/iossimulator-arm64" \
@@ -44,8 +43,8 @@ dotnet build "$CORE_PROJECT" \
 # 编译iOS Simulator x64（可选，用于Intel Mac）
 echo ""
 echo "Building for iOS Simulator x64..."
-dotnet build "$CORE_PROJECT" \
-    -f net10.0-ios \
+$DOTNET_CMD build "$CORE_PROJECT" \
+    -f net9.0-ios \
     -c Release \
     -r iossimulator-x64 \
     -o "$OUTPUT_DIR/iossimulator-x64" \

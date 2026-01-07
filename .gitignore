@@ -369,3 +369,5 @@ FodyWeavers.xsd
 
 # macOS shit
 .DS_Store
+build/
+.dotnet_local/
