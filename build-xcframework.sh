@@ -9,6 +9,8 @@
 #   --input <目录>     库文件输入目录（默认：build/ios）
 #   --output <目录>    XCFramework输出目录（默认：build/xcframework）
 #   --name <名称>      框架名称（默认：M3U8DownloaderKit）
+#   --ios              仅打包iOS架构（真机+模拟器）
+#   --macos            仅打包macOS架构
 #   --clean            打包前清理输出目录
 #   --help             显示帮助信息
 #
@@ -30,6 +32,7 @@ INPUT_DIR="$PROJECT_DIR/build/ios"
 OUTPUT_DIR="$PROJECT_DIR/build/xcframework"
 FRAMEWORK_NAME="M3U8DownloaderKit"
 CLEAN_BEFORE_BUILD=false
+TARGET_PLATFORM="all"  # all, ios, macos
 
 # 动态库名称（.NET生成的库名）
 LIB_NAME="N_m3u8DL-RE.Core"
@@ -53,6 +56,14 @@ while [[ $# -gt 0 ]]; do
             CLEAN_BEFORE_BUILD=true
             shift
             ;;
+        --ios)
+            TARGET_PLATFORM="ios"
+            shift
+            ;;
+        --macos)
+            TARGET_PLATFORM="macos"
+            shift
+            ;;
         --help|-h)
             echo ""
             echo "用法: $0 [选项]"
@@ -61,6 +72,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --input <目录>     库文件输入目录（默认：build/ios）"
             echo "  --output <目录>    XCFramework输出目录（默认：build/xcframework）"
             echo "  --name <名称>      框架名称（默认：M3U8DownloaderKit）"
+            echo "  --ios             仅打包iOS架构"
+            echo "  --macos           仅打包macOS架构"
             echo "  --clean            打包前清理输出目录"
             echo "  --help             显示此帮助信息"
             echo ""
@@ -96,6 +109,7 @@ echo "打包配置:"
 echo "  输入目录: $INPUT_DIR"
 echo "  输出目录: $OUTPUT_DIR"
 echo "  框架名称: $FRAMEWORK_NAME"
+echo "  目标平台: $TARGET_PLATFORM"
 echo ""
 
 # 清理输出目录
@@ -150,7 +164,7 @@ find_dynamic_lib() {
 # 创建 Framework 结构
 create_framework() {
     local arch=$1
-    local platform=$2  # iphoneos 或 iphonesimulator
+    local platform=$2  # iphoneos, iphonesimulator, macosx
     local dylib_path=$3
     local framework_dir="$TEMP_DIR/$arch/${FRAMEWORK_NAME}.framework"
     
@@ -201,13 +215,17 @@ framework module ${FRAMEWORK_NAME} {
 EOF
 
     # 创建 Info.plist
-    local min_ios_version="13.0"
+    local min_version="13.0"
     local platform_name="iPhoneOS"
     local supported_platform="iPhoneOS"
     
     if [ "$platform" = "iphonesimulator" ]; then
         platform_name="iPhoneSimulator"
         supported_platform="iPhoneSimulator"
+    elif [ "$platform" = "macosx" ]; then
+        min_version="12.0"
+        platform_name="MacOSX"
+        supported_platform="MacOSX"
     fi
     
     cat > "$framework_dir/Info.plist" << EOF
@@ -232,7 +250,7 @@ EOF
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>MinimumOSVersion</key>
-    <string>${min_ios_version}</string>
+    <string>${min_version}</string>
     <key>CFBundleSupportedPlatforms</key>
     <array>
         <string>${supported_platform}</string>
@@ -253,6 +271,8 @@ prepare_architecture() {
     # 确定平台
     if [[ "$arch" == *"simulator"* ]]; then
         platform="iphonesimulator"
+    elif [[ "$arch" == "osx"* ]]; then
+        platform="macosx"
     fi
     
     echo ""
@@ -323,14 +343,66 @@ create_simulator_universal_framework() {
     return 0
 }
 
+# 创建macOS通用 Framework（合并arm64和x64）
+create_macos_universal_framework() {
+    local macos_arm64_fw="$TEMP_DIR/osx-arm64/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME"
+    local macos_x64_fw="$TEMP_DIR/osx-x64/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME"
+    local output_dir="$TEMP_DIR/osx-universal/${FRAMEWORK_NAME}.framework"
+    
+    echo ""
+    echo "创建macOS通用 Framework..."
+    
+    # 检查可用的macOS库
+    local available_libs=()
+    [ -f "$macos_arm64_fw" ] && available_libs+=("$macos_arm64_fw")
+    [ -f "$macos_x64_fw" ] && available_libs+=("$macos_x64_fw")
+    
+    if [ ${#available_libs[@]} -eq 0 ]; then
+        echo "警告: 没有可用的macOS库"
+        return 1
+    fi
+    
+    # 复制一个 Framework 作为基础
+    local base_fw=""
+    if [ -f "$macos_arm64_fw" ]; then
+        base_fw="$TEMP_DIR/osx-arm64/${FRAMEWORK_NAME}.framework"
+    else
+        base_fw="$TEMP_DIR/osx-x64/${FRAMEWORK_NAME}.framework"
+    fi
+    
+    mkdir -p "$TEMP_DIR/osx-universal"
+    cp -R "$base_fw" "$TEMP_DIR/osx-universal/"
+    
+    if [ ${#available_libs[@]} -eq 1 ]; then
+        echo "只有一个macOS架构可用，直接使用..."
+    else
+        echo "合并macOS架构..."
+        lipo -create "${available_libs[@]}" -output "$output_dir/$FRAMEWORK_NAME"
+        # 更新 install_name
+        install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME" "$output_dir/$FRAMEWORK_NAME"
+    fi
+    
+    echo "✅ macOS通用 Framework 创建完成"
+    return 0
+}
+
 # 收集可用的架构
 echo ""
 echo "检查可用架构..."
 
 AVAILABLE_ARCHS=()
-prepare_architecture "ios-arm64" && AVAILABLE_ARCHS+=("ios-arm64")
-prepare_architecture "iossimulator-arm64" && AVAILABLE_ARCHS+=("iossimulator-arm64")
-prepare_architecture "iossimulator-x64" && AVAILABLE_ARCHS+=("iossimulator-x64")
+
+# 根据目标平台决定要处理的架构
+if [ "$TARGET_PLATFORM" = "all" ] || [ "$TARGET_PLATFORM" = "ios" ]; then
+    prepare_architecture "ios-arm64" && AVAILABLE_ARCHS+=("ios-arm64")
+    prepare_architecture "iossimulator-arm64" && AVAILABLE_ARCHS+=("iossimulator-arm64")
+    prepare_architecture "iossimulator-x64" && AVAILABLE_ARCHS+=("iossimulator-x64")
+fi
+
+if [ "$TARGET_PLATFORM" = "all" ] || [ "$TARGET_PLATFORM" = "macos" ]; then
+    prepare_architecture "osx-arm64" && AVAILABLE_ARCHS+=("osx-arm64")
+    prepare_architecture "osx-x64" && AVAILABLE_ARCHS+=("osx-x64")
+fi
 
 if [ ${#AVAILABLE_ARCHS[@]} -eq 0 ]; then
     echo ""
@@ -348,6 +420,14 @@ HAS_SIMULATOR_UNIVERSAL=false
 if [[ " ${AVAILABLE_ARCHS[*]} " =~ " iossimulator-arm64 " ]] || [[ " ${AVAILABLE_ARCHS[*]} " =~ " iossimulator-x64 " ]]; then
     if create_simulator_universal_framework; then
         HAS_SIMULATOR_UNIVERSAL=true
+    fi
+fi
+
+# 尝试创建macOS通用 Framework
+HAS_MACOS_UNIVERSAL=false
+if [[ " ${AVAILABLE_ARCHS[*]} " =~ " osx-arm64 " ]] || [[ " ${AVAILABLE_ARCHS[*]} " =~ " osx-x64 " ]]; then
+    if create_macos_universal_framework; then
+        HAS_MACOS_UNIVERSAL=true
     fi
 fi
 
@@ -379,6 +459,21 @@ elif [ -d "$TEMP_DIR/iossimulator-arm64/${FRAMEWORK_NAME}.framework" ]; then
 elif [ -d "$TEMP_DIR/iossimulator-x64/${FRAMEWORK_NAME}.framework" ]; then
     XCODEBUILD_ARGS+=(
         -framework "$TEMP_DIR/iossimulator-x64/${FRAMEWORK_NAME}.framework"
+    )
+fi
+
+# 添加macOS Framework（优先使用通用库）
+if [ "$HAS_MACOS_UNIVERSAL" = true ] && [ -d "$TEMP_DIR/osx-universal/${FRAMEWORK_NAME}.framework" ]; then
+    XCODEBUILD_ARGS+=(
+        -framework "$TEMP_DIR/osx-universal/${FRAMEWORK_NAME}.framework"
+    )
+elif [ -d "$TEMP_DIR/osx-arm64/${FRAMEWORK_NAME}.framework" ]; then
+    XCODEBUILD_ARGS+=(
+        -framework "$TEMP_DIR/osx-arm64/${FRAMEWORK_NAME}.framework"
+    )
+elif [ -d "$TEMP_DIR/osx-x64/${FRAMEWORK_NAME}.framework" ]; then
+    XCODEBUILD_ARGS+=(
+        -framework "$TEMP_DIR/osx-x64/${FRAMEWORK_NAME}.framework"
     )
 fi
 

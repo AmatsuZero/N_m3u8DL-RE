@@ -65,10 +65,12 @@ public final class M3U8Downloader: @unchecked Sendable {
     // MARK: - Static Properties
     
     /// 共享的回调管理器
-    private static var callbackManager = CallbackManager()
+    /// 使用 nonisolated(unsafe) 因为此属性通过外部锁机制保护
+    nonisolated(unsafe) private static var callbackManager = CallbackManager()
     
-    /// 全局实例映射 (线程安全)
-    private static var instances: [m3u8dl_instance_t: M3U8Downloader] = [:]
+    /// 全局实例映射 (线程安全，通过 instancesLock 保护)
+    /// 使用 nonisolated(unsafe) 因为访问受 instancesLock 保护
+    nonisolated(unsafe) private static var instances: [m3u8dl_instance_t: M3U8Downloader] = [:]
     private static let instancesLock = NSLock()
     
     // MARK: - Initialization
@@ -126,7 +128,8 @@ public final class M3U8Downloader: @unchecked Sendable {
     
     // MARK: - Global Callbacks Setup
     
-    private static var callbacksSetup = false
+    /// 回调是否已设置（通过 callbacksSetupLock 保护）
+    nonisolated(unsafe) private static var callbacksSetup = false
     private static let callbacksSetupLock = NSLock()
     
     private static func setupGlobalCallbacks() {

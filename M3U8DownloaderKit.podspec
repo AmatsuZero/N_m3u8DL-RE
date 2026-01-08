@@ -6,11 +6,13 @@
 #  使用方法:
 #    pod 'M3U8DownloaderKit'
 #
-#  本地验证（由于 XCFramework 仅支持真机，需要跳过导入验证）:
-#    pod lib lint M3U8DownloaderKit.podspec --allow-warnings --skip-import-validation
+#  本地验证:
+#    pod lib lint M3U8DownloaderKit.podspec --allow-warnings
+#    pod spec lint M3U8DownloaderKit.podspec --allow-warnings --quick
 #
-#  或者只验证 Swift 代码（不链接 XCFramework）:
-#    pod lib lint M3U8DownloaderKit.podspec --allow-warnings --skip-import-validation --no-clean
+#  支持平台:
+#    - iOS 15.0+ (真机 + 模拟器)
+#    - macOS 12.0+ (Apple Silicon + Intel)
 #
 
 Pod::Spec.new do |spec|
@@ -30,15 +32,16 @@ Pod::Spec.new do |spec|
     - 实时下载进度监控
     - 分段下载和合并
     
-    注意：此库仅支持真机设备（arm64），不支持模拟器。
+    支持平台：iOS 15.0+、macOS 12.0+
   DESC
   
   spec.homepage     = "https://github.com/AmatsuZero/N_m3u8DL-RE"
   spec.license      = { :type => "MIT", :file => "LICENSE" }
   spec.author       = { "AmatsuZero" => "amatsuZero@jzh16s.com" }
   
-  # 平台要求 - 仅支持真机设备
+  # 平台要求
   spec.ios.deployment_target = "15.0"
+  spec.osx.deployment_target = "12.0"
   
   # Swift 版本
   spec.swift_versions = ["5.9", "5.10", "6.0"]
@@ -50,10 +53,10 @@ Pod::Spec.new do |spec|
     :tag => "v#{spec.version}"
   }
   
-  # 源文件
+  # 源文件 - Swift 包装层代码 + C 桥接层头文件
   spec.source_files = [
     "Sources/M3U8DownloaderKit/**/*.swift",
-    "Sources/M3U8DownloaderKit_C/**/*.{h,c}"
+    "Sources/M3U8DownloaderKit_C/include/**/*.h"
   ]
   
   # 排除测试用的 Mock 文件
@@ -64,7 +67,8 @@ Pod::Spec.new do |spec|
   # 公开头文件
   spec.public_header_files = "Sources/M3U8DownloaderKit_C/include/*.h"
   
-  # XCFramework 依赖（仅支持 ios-arm64 真机架构）
+  # XCFramework 依赖（包含所有平台架构）
+  # 注意：XCFramework 中已包含 C 接口的头文件和实现
   spec.vendored_frameworks = "build/xcframework/M3U8DownloaderKit.xcframework"
   
   # 模块映射
@@ -72,16 +76,19 @@ Pod::Spec.new do |spec|
   
   # 构建配置
   spec.pod_target_xcconfig = {
+    # 定义 COCOAPODS 宏，用于条件编译
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS" => "COCOAPODS",
+    # 头文件搜索路径
+    "HEADER_SEARCH_PATHS" => "$(PODS_TARGET_SRCROOT)/Sources/M3U8DownloaderKit_C/include",
+    # 让 Swift 能够导入 C 头文件
     "SWIFT_INCLUDE_PATHS" => "$(PODS_TARGET_SRCROOT)/Sources/M3U8DownloaderKit_C/include",
-    "OTHER_LDFLAGS" => "-ObjC",
-    # 排除模拟器架构（XCFramework 仅包含真机架构）
-    "EXCLUDED_ARCHS[sdk=iphonesimulator*]" => "arm64 x86_64"
+    # 链接配置
+    "OTHER_LDFLAGS" => "-ObjC"
   }
   
   # 用户构建配置
   spec.user_target_xcconfig = {
-    # 排除模拟器架构
-    "EXCLUDED_ARCHS[sdk=iphonesimulator*]" => "arm64 x86_64"
+    # 无需排除架构，支持所有平台
   }
   
   # 框架依赖

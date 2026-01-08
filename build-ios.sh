@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# N_m3u8DL-RE iOS构建脚本
-# 使用 NativeAOT + RuntimePack 方式构建 iOS 原生库
+# N_m3u8DL-RE iOS/macOS 构建脚本
+# 使用 NativeAOT + RuntimePack 方式构建原生库
 # 
 # 用法:
 #   ./build-ios.sh [选项]
@@ -9,9 +9,13 @@
 # 选项:
 #   --arch <架构>    仅编译指定架构，可选值：
 #                     ios-arm64          - iOS真机
-#                     iossimulator-arm64 - 模拟器(Apple Silicon)
-#                     iossimulator-x64   - 模拟器(Intel)
+#                     iossimulator-arm64 - iOS模拟器(Apple Silicon)
+#                     iossimulator-x64   - iOS模拟器(Intel)
+#                     osx-arm64          - macOS (Apple Silicon)
+#                     osx-x64            - macOS (Intel)
 #   --all           编译所有架构（默认）
+#   --ios           仅编译iOS相关架构（真机+模拟器）
+#   --macos         仅编译macOS相关架构
 #   --release       Release模式（默认）
 #   --debug         Debug模式
 #   --clean         编译前清理输出目录
@@ -21,14 +25,16 @@
 #   ./build-ios.sh                           # 编译所有架构
 #   ./build-ios.sh --arch ios-arm64          # 仅编译iOS真机架构
 #   ./build-ios.sh --arch iossimulator-arm64 # 仅编译模拟器(Apple Silicon)
+#   ./build-ios.sh --arch osx-arm64          # 仅编译macOS(Apple Silicon)
+#   ./build-ios.sh --ios                     # 编译所有iOS架构
+#   ./build-ios.sh --macos                   # 编译所有macOS架构
 #   ./build-ios.sh --debug                   # Debug模式
 
 set -e
 
 echo "========================================="
-echo "N_m3u8DL-RE iOS Build Script"
-echo "========================================="
-
+echo "N_m3u8DL-RE iOS/macOS Build Script"
+echo "========================================="\n
 # 项目路径
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOTNET_CMD="$PROJECT_DIR/.dotnet_local/dotnet"
@@ -70,9 +76,13 @@ while [[ $# -gt 0 ]]; do
             echo "选项:"
             echo "  --arch <架构>      仅编译指定架构"
             echo "                      ios-arm64          - iOS真机"
-            echo "                      iossimulator-arm64 - 模拟器(Apple Silicon)"
-            echo "                      iossimulator-x64   - 模拟器(Intel)"
+            echo "                      iossimulator-arm64 - iOS模拟器(Apple Silicon)"
+            echo "                      iossimulator-x64   - iOS模拟器(Intel)"
+            echo "                      osx-arm64          - macOS (Apple Silicon)"
+            echo "                      osx-x64            - macOS (Intel)"
             echo "  --all             编译所有架构（默认）"
+            echo "  --ios             仅编译iOS相关架构"
+            echo "  --macos           仅编译macOS相关架构"
             echo "  --release         Release模式（默认）"
             echo "  --debug           Debug模式"
             echo "  --clean           编译前清理输出目录"
@@ -83,6 +93,14 @@ while [[ $# -gt 0 ]]; do
             echo "  $0 --arch ios-arm64    # 仅编译iOS真机架构"
             echo ""
             exit 0
+            ;;
+        --ios)
+            TARGET_ARCH="ios"
+            shift
+            ;;
+        --macos)
+            TARGET_ARCH="macos"
+            shift
             ;;
         *)
             echo "未知选项: $1"
@@ -244,15 +262,34 @@ case $TARGET_ARCH in
     iossimulator-x64)
         build_architecture "iossimulator-x64" "iossimulator-x64"
         ;;
-    all)
-        # 编译所有架构
+    osx-arm64)
+        build_architecture "osx-arm64" "osx-arm64"
+        ;;
+    osx-x64)
+        build_architecture "osx-x64" "osx-x64"
+        ;;
+    ios)
+        # 编译所有iOS架构（真机+模拟器）
         build_architecture "ios-arm64" "ios-arm64"
         build_architecture "iossimulator-arm64" "iossimulator-arm64"
         build_architecture "iossimulator-x64" "iossimulator-x64"
         ;;
+    macos)
+        # 编译所有macOS架构
+        build_architecture "osx-arm64" "osx-arm64"
+        build_architecture "osx-x64" "osx-x64"
+        ;;
+    all)
+        # 编译所有架构（iOS + macOS）
+        build_architecture "ios-arm64" "ios-arm64"
+        build_architecture "iossimulator-arm64" "iossimulator-arm64"
+        build_architecture "iossimulator-x64" "iossimulator-x64"
+        build_architecture "osx-arm64" "osx-arm64"
+        build_architecture "osx-x64" "osx-x64"
+        ;;
     *)
         echo "错误: 未知架构 '$TARGET_ARCH'"
-        echo "支持的架构: ios-arm64, iossimulator-arm64, iossimulator-x64, all"
+        echo "支持的架构: ios-arm64, iossimulator-arm64, iossimulator-x64, osx-arm64, osx-x64, ios, macos, all"
         exit 1
         ;;
 esac

@@ -48,8 +48,8 @@ let package = Package(
                 .headerSearchPath("include")
             ],
             linkerSettings: [
-                // 链接 XCFramework
-                .linkedFramework("M3U8DownloaderKit", .when(platforms: [.iOS])),
+                // 链接 XCFramework（iOS 和 macOS）
+                .linkedFramework("M3U8DownloaderKit", .when(platforms: [.iOS, .macOS])),
                 .linkedFramework("Foundation"),
                 // 系统库
                 .linkedLibrary("z"),
