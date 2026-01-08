@@ -6,6 +6,12 @@
 #  使用方法:
 #    pod 'M3U8DownloaderKit'
 #
+#  本地验证（由于 XCFramework 仅支持真机，需要跳过导入验证）:
+#    pod lib lint M3U8DownloaderKit.podspec --allow-warnings --skip-import-validation
+#
+#  或者只验证 Swift 代码（不链接 XCFramework）:
+#    pod lib lint M3U8DownloaderKit.podspec --allow-warnings --skip-import-validation --no-clean
+#
 
 Pod::Spec.new do |spec|
   spec.name         = "M3U8DownloaderKit"
@@ -23,41 +29,59 @@ Pod::Spec.new do |spec|
     - 加密流解密支持
     - 实时下载进度监控
     - 分段下载和合并
+    
+    注意：此库仅支持真机设备（arm64），不支持模拟器。
   DESC
   
-  spec.homepage     = "https://github.com/nilaoda/N_m3u8DL-RE"
+  spec.homepage     = "https://github.com/AmatsuZero/N_m3u8DL-RE"
   spec.license      = { :type => "MIT", :file => "LICENSE" }
-  spec.author       = { "nilaoda" => "nilaoda@example.com" }
+  spec.author       = { "AmatsuZero" => "amatsuZero@jzh16s.com" }
   
-  # 平台要求
-  spec.ios.deployment_target = "13.0"
+  # 平台要求 - 仅支持真机设备
+  spec.ios.deployment_target = "15.0"
   
   # Swift 版本
   spec.swift_versions = ["5.9", "5.10", "6.0"]
   
   # 源码位置
+  # 注意：发布前需要先创建对应的 git tag
   spec.source       = {
-    :git => "https://github.com/nilaoda/N_m3u8DL-RE.git",
+    :git => "https://github.com/AmatsuZero/N_m3u8DL-RE.git",
     :tag => "v#{spec.version}"
   }
   
   # 源文件
   spec.source_files = [
-    "swift/Sources/M3U8DownloaderKit/**/*.swift",
-    "swift/Sources/M3U8DownloaderKit_C/**/*.{h,c}"
+    "Sources/M3U8DownloaderKit/**/*.swift",
+    "Sources/M3U8DownloaderKit_C/**/*.{h,c}"
+  ]
+  
+  # 排除测试用的 Mock 文件
+  spec.exclude_files = [
+    "Sources/M3U8DownloaderKit/MockImplementation.swift"
   ]
   
   # 公开头文件
-  spec.public_header_files = "swift/Sources/M3U8DownloaderKit_C/include/*.h"
+  spec.public_header_files = "Sources/M3U8DownloaderKit_C/include/*.h"
   
-  # XCFramework 依赖
+  # XCFramework 依赖（仅支持 ios-arm64 真机架构）
   spec.vendored_frameworks = "build/xcframework/M3U8DownloaderKit.xcframework"
   
   # 模块映射
-  spec.preserve_paths = "swift/Sources/M3U8DownloaderKit_C/include/module.modulemap"
+  spec.preserve_paths = "Sources/M3U8DownloaderKit_C/include/module.modulemap"
+  
+  # 构建配置
   spec.pod_target_xcconfig = {
-    "SWIFT_INCLUDE_PATHS" => "$(PODS_TARGET_SRCROOT)/swift/Sources/M3U8DownloaderKit_C/include",
-    "OTHER_LDFLAGS" => "-ObjC"
+    "SWIFT_INCLUDE_PATHS" => "$(PODS_TARGET_SRCROOT)/Sources/M3U8DownloaderKit_C/include",
+    "OTHER_LDFLAGS" => "-ObjC",
+    # 排除模拟器架构（XCFramework 仅包含真机架构）
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]" => "arm64 x86_64"
+  }
+  
+  # 用户构建配置
+  spec.user_target_xcconfig = {
+    # 排除模拟器架构
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]" => "arm64 x86_64"
   }
   
   # 框架依赖

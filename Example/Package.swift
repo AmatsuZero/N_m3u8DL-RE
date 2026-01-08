@@ -23,15 +23,15 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // 本地依赖 M3U8DownloaderKit
-        // 注意: 包标识符使用目录名 "swift"
+        // 本地依赖 M3U8DownloaderKit (根目录的 Package.swift)
         .package(path: "../"),
     ],
     targets: [
         .executableTarget(
             name: "M3U8DemoApp",
             dependencies: [
-                .product(name: "M3U8DownloaderKit", package: "swift"),
+                // 包标识符使用包名 "M3U8DownloaderKit"
+                .product(name: "M3U8DownloaderKit", package: "M3U8DownloaderKit"),
             ],
             path: "Sources/M3U8DemoApp",
             swiftSettings: [
