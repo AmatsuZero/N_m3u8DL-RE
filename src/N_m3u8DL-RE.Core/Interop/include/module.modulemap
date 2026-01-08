@@ -1,0 +1,4 @@
+module M3U8DL {
+    header "m3u8dl.h"
+    export *
+}

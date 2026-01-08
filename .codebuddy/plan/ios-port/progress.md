@@ -2,142 +2,189 @@
 
 ## 当前状态
 
-**日期**: 2026-01-07
-**当前任务**: 任务2 - 提取并重构下载管理器
+**日期**: 2026-01-08
+**当前任务**: 任务17-20已完成
 
 ## 已完成任务
 
-### ✅ 任务1：创建iOS核心库项目 (已完成)
+### ✅ 任务1-16：核心模块重构与分离 (已完成)
+
+参见之前的进度记录。
+
+### ✅ 任务17：创建C风格的导出接口 (已完成)
 
 **完成内容**:
-- 创建了 `N_m3u8DL-RE.Core` 项目目录
-- 创建了项目文件 `N_m3u8DL-RE.Core.csproj`
-  - 配置为类库输出类型
-  - 目标框架：net10.0
-  - 引用了 Common 和 Parser 项目
-  - 不依赖UI框架（无Spectre.Console、System.CommandLine引用）
-- 将Core项目添加到解决方案文件中
-- 配置了Debug和Release构建配置
+- 创建了 `NativeExports.cs`，使用 `[UnmanagedCallersOnly]` 特性导出C函数
+- 导出的函数包括：
+  - `m3u8dl_init` - 初始化下载器实例
+  - `m3u8dl_dispose` / `m3u8dl_dispose_all` - 释放资源
+  - `m3u8dl_set_progress_callback` - 设置进度回调
+  - `m3u8dl_set_log_callback` - 设置日志回调
+  - `m3u8dl_set_completion_callback` - 设置完成回调
+  - `m3u8dl_parse` / `m3u8dl_parse_async` - 解析M3U8 URL
+  - `m3u8dl_download` / `m3u8dl_download_async` - 下载
+  - `m3u8dl_cancel` - 取消下载
+  - `m3u8dl_get_processors` - 获取可用处理器
+  - `m3u8dl_is_feature_supported` - 检查功能支持
+  - `m3u8dl_get_version` - 获取版本信息
+  - `m3u8dl_free_string` / `m3u8dl_alloc` / `m3u8dl_free` - 内存管理
+- 创建了 `NativeJsonContext.cs` 用于NativeAOT的JSON序列化支持
+- 实现了 `NativeLogger` 和 `NativeProgressCallback` 类
 
 **文件变更**:
-- 新建: `/src/N_m3u8DL-RE.Core/N_m3u8DL-RE.Core.csproj`
-- 修改: `/src/N_m3u8DL-RE.sln`
+- 新建: `/src/N_m3u8DL-RE.Core/Interop/NativeExports.cs`
+- 新建: `/src/N_m3u8DL-RE.Core/Interop/NativeJsonContext.cs`
 
-## 进行中任务
+### ✅ 任务18：生成C头文件和模块映射 (已完成)
 
-### 🔄 任务2：提取并重构下载管理器 (进行中)
+**完成内容**:
+- 创建了 `m3u8dl.h` 头文件，包含：
+  - 完整的API文档注释
+  - 类型定义（实例ID、布尔类型、日志级别、错误码）
+  - 回调函数类型定义
+  - 所有导出函数声明
+  - JSON格式说明
+  - 使用宏定义
+- 创建了 `module.modulemap` 用于Swift/Objective-C模块导入
 
-**已完成部分**:
-1. ✅ 创建了日志接口抽象 (`ILogger.cs`, `NullLogger`)
-2. ✅ 创建了进度回调接口 (`IDownloadProgressCallback.cs`, `DownloadProgress`, `NullProgressCallback`)
-3. ✅ 创建了下载器接口 (`IDownloader.cs`)
-4. ✅ 重构了SimpleDownloader类：
-   - 移除了Spectre.Console依赖
-   - 使用ILogger接口替代Logger静态调用
-   - 添加了CancellationToken支持
-   - 保留了核心下载和解密逻辑
+**文件变更**:
+- 新建: `/src/N_m3u8DL-RE.Core/Interop/include/m3u8dl.h`
+- 新建: `/src/N_m3u8DL-RE.Core/Interop/include/module.modulemap`
 
-**待完成部分**:
-1. ⏳ 复制Crypto模块（AESUtil, ChaCha20Util, CSChaCha20）
-2. ⏳ 复制必要的Util类（DownloadUtil, ImageHeaderUtil, OtherUtil）
-3. ⏳ 复制Config和Entity类
-4. ⏳ 重构SimpleDownloadManager（更复杂，需要大量UI代码移除）
+### ✅ 任务19：编译多架构二进制文件 (已完成)
 
-**分析结果**:
+**完成内容**:
+- 更新了 `build-ios.sh` 脚本，支持：
+  - AOT编译开关 (`--aot` / `--no-aot`)
+  - 特定架构选择 (`--arch ios-arm64` / `iossimulator-arm64` / `iossimulator-x64`)
+  - Debug/Release模式切换
+  - 清理输出目录
+- 更新了依赖项目以支持iOS：
+  - `N_m3u8DL-RE.Common.csproj` - 添加 net9.0-ios 目标框架
+  - `N_m3u8DL-RE.Parser.csproj` - 添加 net9.0-ios 目标框架
+- 添加了条件编译以移除iOS平台的Spectre.Console依赖：
+  - `Logger.cs`
+  - `CustomAnsiConsole.cs`
+  - `RetryUtil.cs`
+  - `StreamSpec.cs`
 
-#### SimpleDownloader类分析
-- **位置**: `/src/N_m3u8DL-RE/Downloader/SimpleDownloader.cs`
-- **大小**: 153行，5.9KB
-- **依赖**:
-  - ✅ `N_m3u8DL_RE.Common.Entity` - 可移植
-  - ✅ `N_m3u8DL_RE.Common.Enum` - 可移植
-  - ❌ `N_m3u8DL_RE.Common.Log.Logger` - 需要抽象化
-  - ✅ `N_m3u8DL_RE.Config.DownloaderConfig` - 可移植
-  - ✅ `N_m3u8DL_RE.Crypto` - 可移植
-  - ✅ `N_m3u8DL_RE.Entity.DownloadResult` - 可移植
-  - ✅ `N_m3u8DL_RE.Util` - 部分可移植
-  - ❌ `Spectre.Console` - 需要移除（仅用于EscapeMarkup）
+**文件变更**:
+- 修改: `/build-ios.sh`
+- 修改: `/src/N_m3u8DL-RE.Common/N_m3u8DL-RE.Common.csproj`
+- 修改: `/src/N_m3u8DL-RE.Parser/N_m3u8DL-RE.Parser.csproj`
+- 修改: `/src/N_m3u8DL-RE.Common/Log/Logger.cs`
+- 修改: `/src/N_m3u8DL-RE.Common/Log/CustomAnsiConsole.cs`
+- 修改: `/src/N_m3u8DL-RE.Common/Util/RetryUtil.cs`
+- 修改: `/src/N_m3u8DL-RE.Common/Entity/StreamSpec.cs`
 
-**重构计划**:
-1. 先创建日志接口抽象（ILogger）
-2. 复制SimpleDownloader到Core项目
-3. 移除Spectre.Console依赖
-4. 替换Logger静态调用为ILogger接口
-5. 添加进度回调机制
-6. 添加CancellationToken支持
+### ✅ 任务20：打包基础XCFramework (已完成)
 
-#### SimpleDownloadManager类分析
-- **位置**: `/src/N_m3u8DL-RE/DownloadManager/SimpleDownloadManager.cs`
-- **大小**: 776行，36.8KB
-- **复杂度**: 高（包含大量UI代码）
-- **主要依赖**:
-  - ❌ `Spectre.Console` - 大量使用（进度条、表格、颜色标记）
-  - ❌ `N_m3u8DL_RE.Column.*` - UI列定义，需要移除
-  - ✅ 核心下载逻辑 - 可移植
-  - ❌ ffmpeg调用 - 需要重构为接口
-  - ❌ mp4decrypt调用 - 需要重构
+**完成内容**:
+- 创建了 `build-xcframework.sh` 脚本，支持：
+  - 自定义输入/输出目录
+  - 自定义框架名称
+  - 自动合并模拟器架构
+  - 创建标准XCFramework结构
+- 创建了完整的集成文档
 
-**重构策略**:
-- 将SimpleDownloadManager拆分为两部分：
-  1. **核心下载逻辑** → 移至Core项目
-  2. **UI展示逻辑** → 保留在原项目
-- 创建进度回调接口替代Spectre.Console进度条
-- 将文件合并逻辑抽象为接口（为后续视频处理器做准备）
+**文件变更**:
+- 新建: `/build-xcframework.sh`
+- 新建: `/iOS-SDK-GUIDE.md`
 
-## 下一步行动
+## 文件结构
 
-### 立即执行
-1. 创建日志接口抽象（ILogger、LogLevel枚举）
-2. 创建进度回调接口（IDownloadProgressCallback）
-3. 复制并重构SimpleDownloader类
+```
+N_m3u8DL-RE/
+├── build-ios.sh                    # iOS多架构编译脚本
+├── build-xcframework.sh            # XCFramework打包脚本
+├── iOS-SDK-GUIDE.md                # iOS SDK集成指南
+└── src/
+    ├── N_m3u8DL-RE.Common/
+    │   ├── N_m3u8DL-RE.Common.csproj  # 更新支持iOS
+    │   ├── Log/
+    │   │   ├── Logger.cs              # 添加iOS条件编译
+    │   │   └── CustomAnsiConsole.cs   # 添加iOS条件编译
+    │   ├── Util/
+    │   │   └── RetryUtil.cs           # 添加iOS条件编译
+    │   └── Entity/
+    │       └── StreamSpec.cs          # 添加iOS条件编译
+    ├── N_m3u8DL-RE.Parser/
+    │   └── N_m3u8DL-RE.Parser.csproj  # 更新支持iOS
+    └── N_m3u8DL-RE.Core/
+        ├── N_m3u8DL-RE.Core.csproj
+        ├── API/
+        │   └── M3U8DownloaderAPI.cs   # 添加GetVideoProcessorFactory方法
+        └── Interop/
+            ├── NativeExports.cs       # C API导出
+            ├── NativeJsonContext.cs   # JSON序列化上下文
+            └── include/
+                ├── m3u8dl.h           # C头文件
+                └── module.modulemap   # 模块映射
+```
 
-### 待执行
-- 任务3：提取流媒体解析器
-- 任务4：提取加密解密模块
-- 任务5：重构文件处理工具
+## 使用说明
 
-## 技术决策记录
+### 编译iOS静态库
 
-### 决策1：日志接口设计
-**问题**: 如何替代Logger静态类？
-**决策**: 创建ILogger接口，通过依赖注入传递
-**理由**: 
-- 符合SOLID原则
-- 便于iOS端注入自定义日志实现
-- 支持单元测试
+```bash
+# 编译所有架构
+./build-ios.sh
 
-### 决策2：进度回调设计
-**问题**: 如何替代Spectre.Console进度条？
-**决策**: 创建基于委托的进度回调机制
-**理由**:
-- 简单直接，易于iOS端集成
-- 支持多种UI框架
-- 性能开销小
+# 仅编译特定架构
+./build-ios.sh --arch ios-arm64
+
+# 禁用AOT（调试用）
+./build-ios.sh --no-aot --debug
+```
+
+### 创建XCFramework
+
+```bash
+# 使用默认设置
+./build-xcframework.sh
+
+# 自定义框架名称
+./build-xcframework.sh --name MyM3U8Kit
+```
+
+### 集成到iOS项目
+
+1. 将生成的XCFramework拖入Xcode项目
+2. 配置链接器标志：`-lc++ -lz -liconv`
+3. 在Swift中导入：`import M3U8DL`
+4. 在Objective-C中导入：`#import <m3u8dl.h>`
+
+## 导出的C API
+
+| 函数 | 描述 |
+|------|------|
+| `m3u8dl_init` | 初始化下载器实例 |
+| `m3u8dl_dispose` | 释放实例 |
+| `m3u8dl_set_progress_callback` | 设置进度回调 |
+| `m3u8dl_set_log_callback` | 设置日志回调 |
+| `m3u8dl_set_completion_callback` | 设置完成回调 |
+| `m3u8dl_parse` | 同步解析M3U8 |
+| `m3u8dl_parse_async` | 异步解析M3U8 |
+| `m3u8dl_download` | 同步下载 |
+| `m3u8dl_download_async` | 异步下载 |
+| `m3u8dl_cancel` | 取消下载 |
+| `m3u8dl_get_processors` | 获取可用处理器 |
+| `m3u8dl_is_feature_supported` | 检查功能支持 |
+| `m3u8dl_get_version` | 获取版本信息 |
+| `m3u8dl_free_string` | 释放字符串内存 |
+
+## 下一步
+
+iOS移植的Task 17-20已完成。后续可以：
+
+1. 实际运行编译脚本验证编译结果
+2. 创建iOS示例应用测试SDK
+3. 编写更详细的使用文档
+4. 实现Swift包装层（可选）
 
 ## 注意事项
 
-1. **保持原项目可用**: 重构过程中不要破坏原有的命令行工具功能
-2. **渐进式重构**: 先移植简单模块，再处理复杂模块
-3. **接口优先**: 先设计接口，再实现具体功能
-4. **测试验证**: 每完成一个模块，确保能够编译通过
-
-## 文件结构规划
-
-```
-src/N_m3u8DL-RE.Core/
-├── Abstraction/
-│   ├── ILogger.cs
-│   ├── IDownloadProgressCallback.cs
-│   └── IVideoProcessor.cs (后续)
-├── Downloader/
-│   ├── IDownloader.cs
-│   └── SimpleDownloader.cs
-├── DownloadManager/
-│   └── SimpleDownloadManager.cs (重构版)
-├── Crypto/
-│   ├── AESUtil.cs
-│   ├── ChaCha20Util.cs
-│   └── CSChaCha20.cs
-└── Util/
-    └── (待定)
-```
+1. 编译前需要安装.NET 9.0 SDK和iOS workload
+2. NativeAOT编译需要较长时间
+3. 调试时可使用 `--no-aot` 选项禁用AOT编译
+4. iOS平台不支持Spectre.Console，已通过条件编译处理

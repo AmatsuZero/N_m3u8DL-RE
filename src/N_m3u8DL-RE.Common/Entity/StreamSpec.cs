@@ -1,6 +1,8 @@
 ﻿using N_m3u8DL_RE.Common.Enum;
 using N_m3u8DL_RE.Common.Util;
+#if !IOS
 using Spectre.Console;
+#endif
 
 namespace N_m3u8DL_RE.Common.Entity;
 
@@ -63,6 +65,18 @@ public class StreamSpec
         }
     }
 
+    /// <summary>
+    /// 安全转义字符串（iOS兼容）
+    /// </summary>
+    private static string SafeEscape(string? value)
+    {
+#if IOS
+        return value ?? "";
+#else
+        return (value ?? "").EscapeMarkup();
+#endif
+    }
+
     public string ToShortString()
     {
         var prefixStr = "";
@@ -71,21 +85,33 @@ public class StreamSpec
 
         if (MediaType == Enum.MediaType.AUDIO)
         {
+#if IOS
+            prefixStr = $"Aud {encStr}";
+#else
             prefixStr = $"[deepskyblue3]Aud[/] {encStr}";
+#endif
             var d = $"{GroupId} | {(Bandwidth != null ? (Bandwidth / 1000) + " Kbps" : "")} | {Name} | {Codecs} | {Language} | {(Channels != null ? Channels + "CH" : "")} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
         else if (MediaType == Enum.MediaType.SUBTITLES)
         {
+#if IOS
+            prefixStr = $"Sub {encStr}";
+#else
             prefixStr = $"[deepskyblue3_1]Sub[/] {encStr}";
+#endif
             var d = $"{GroupId} | {Language} | {Name} | {Codecs} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
         else
         {
+#if IOS
+            prefixStr = $"Vid {encStr}";
+#else
             prefixStr = $"[aqua]Vid[/] {encStr}";
+#endif
             var d = $"{Resolution} | {Bandwidth / 1000} Kbps | {GroupId} | {FrameRate} | {Codecs} | {VideoRange} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
 
         returnStr = prefixStr + returnStr.Trim().Trim('|').Trim();
@@ -105,21 +131,33 @@ public class StreamSpec
 
         if (MediaType == Enum.MediaType.AUDIO)
         {
+#if IOS
+            prefixStr = $"Aud {encStr}";
+#else
             prefixStr = $"[deepskyblue3]Aud[/] {encStr}";
+#endif
             var d = $"{(Bandwidth != null ? (Bandwidth / 1000) + " Kbps" : "")} | {Name} | {Language} | {(Channels != null ? Channels + "CH" : "")} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
         else if (MediaType == Enum.MediaType.SUBTITLES)
         {
+#if IOS
+            prefixStr = $"Sub {encStr}";
+#else
             prefixStr = $"[deepskyblue3_1]Sub[/] {encStr}";
+#endif
             var d = $"{Language} | {Name} | {Codecs} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
         else
         {
+#if IOS
+            prefixStr = $"Vid {encStr}";
+#else
             prefixStr = $"[aqua]Vid[/] {encStr}";
+#endif
             var d = $"{Resolution} | {Bandwidth / 1000} Kbps | {FrameRate} | {VideoRange} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
 
         returnStr = prefixStr + returnStr.Trim().Trim('|').Trim();
@@ -142,26 +180,42 @@ public class StreamSpec
         if (Playlist != null && Playlist.MediaParts.Any(m => m.MediaSegments.Any(s => s.EncryptInfo.Method != EncryptMethod.NONE)))
         {
             var ms = Playlist.MediaParts.SelectMany(m => m.MediaSegments.Select(s => s.EncryptInfo.Method)).Where(e => e != EncryptMethod.NONE).Distinct();
+#if IOS
+            encStr = $"*{string.Join(",", ms)} ";
+#else
             encStr = $"[red]*{string.Join(",", ms).EscapeMarkup()}[/] ";
+#endif
         }
 
         if (MediaType == Enum.MediaType.AUDIO)
         {
+#if IOS
+            prefixStr = $"Aud {encStr}";
+#else
             prefixStr = $"[deepskyblue3]Aud[/] {encStr}";
+#endif
             var d = $"{GroupId} | {(Bandwidth != null ? (Bandwidth / 1000) + " Kbps" : "")} | {Name} | {Codecs} | {Language} | {(Channels != null ? Channels + "CH" : "")} | {segmentsCountStr} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
         else if (MediaType == Enum.MediaType.SUBTITLES)
         {
+#if IOS
+            prefixStr = $"Sub {encStr}";
+#else
             prefixStr = $"[deepskyblue3_1]Sub[/] {encStr}";
+#endif
             var d = $"{GroupId} | {Language} | {Name} | {Codecs} | {Characteristics} | {segmentsCountStr} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
         else
         {
+#if IOS
+            prefixStr = $"Vid {encStr}";
+#else
             prefixStr = $"[aqua]Vid[/] {encStr}";
+#endif
             var d = $"{Resolution} | {Bandwidth / 1000} Kbps | {GroupId} | {FrameRate} | {Codecs} | {VideoRange} | {segmentsCountStr} | {Role}";
-            returnStr = d.EscapeMarkup();
+            returnStr = SafeEscape(d);
         }
 
         returnStr = prefixStr + returnStr.Trim().Trim('|').Trim();

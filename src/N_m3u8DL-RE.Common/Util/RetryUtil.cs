@@ -1,6 +1,8 @@
 using System.Net;
 using N_m3u8DL_RE.Common.Log;
+#if !IOS
 using Spectre.Console;
+#endif
 
 namespace N_m3u8DL_RE.Common.Util;
 
@@ -23,7 +25,11 @@ public static class RetryUtil
             {
                 currentException = ex;
                 retryCount++;
+#if IOS
+                Logger.WarnMarkUp($"{ex.Message} ({retryCount}/{maxRetries})");
+#else
                 Logger.WarnMarkUp($"[grey]{ex.Message.EscapeMarkup()} ({retryCount}/{maxRetries})[/]");
+#endif
                 await Task.Delay(retryDelayMilliseconds + (retryDelayIncrementMilliseconds * (retryCount - 1)));
             }
         }

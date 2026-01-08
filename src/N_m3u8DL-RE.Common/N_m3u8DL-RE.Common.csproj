@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<OutputType>library</OutputType>
+    <OutputType>library</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>N_m3u8DL_RE.Common</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -9,8 +9,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Spectre.Console 包引用 - 始终引入，代码中使用 #if !IOS 条件编译 -->
   <ItemGroup>
-	  <PackageReference Include="Spectre.Console" Version="0.52.1-preview.0.5" />
+    <PackageReference Include="Spectre.Console" Version="0.52.1-preview.0.5" />
   </ItemGroup>
+
+  <!-- iOS 平台条件编译常量 - 使用多种方式确保定义 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64' Or '$(RuntimeIdentifier)' == 'iossimulator-arm64' Or '$(RuntimeIdentifier)' == 'iossimulator-x64'">
+    <DefineConstants>$(DefineConstants);IOS</DefineConstants>
+  </PropertyGroup>
 	
 </Project>

@@ -5,7 +5,9 @@ using N_m3u8DL_RE.Common.Resource;
 using N_m3u8DL_RE.Common.Util;
 using N_m3u8DL_RE.Parser.Config;
 using N_m3u8DL_RE.Parser.Util;
+#if !IOS
 using Spectre.Console;
+#endif
 
 namespace N_m3u8DL_RE.Parser.Processor.HLS;
 
@@ -70,7 +72,11 @@ public class DefaultHLSKeyProcessor : KeyProcessor
                 }
                 catch (Exception _ex) when (!_ex.Message.Contains("scheme is not supported."))
                 {
+#if IOS
+                    Logger.WarnMarkUp($"[grey]{_ex.Message} retryCount: {retryCount}[/]");
+#else
                     Logger.WarnMarkUp($"[grey]{_ex.Message.EscapeMarkup()} retryCount: {retryCount}[/]");
+#endif
                     Thread.Sleep(1000);
                     if (retryCount-- > 0) goto getHttpKey;
                     throw;

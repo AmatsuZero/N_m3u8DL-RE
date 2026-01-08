@@ -281,6 +281,16 @@ public class M3U8DownloaderAPI
     }
 
     /// <summary>
+    /// 获取视频处理器工厂（高级用法）
+    /// </summary>
+    /// <returns>视频处理器工厂</returns>
+    public VideoProcessorFactory GetVideoProcessorFactory()
+    {
+        EnsureInitialized();
+        return _processorFactory;
+    }
+
+    /// <summary>
     /// 检查功能是否可用
     /// </summary>
     /// <param name="feature">功能名称</param>

@@ -9,6 +9,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- iOS 平台条件编译 -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('ios')) Or $(RuntimeIdentifier.StartsWith('iossimulator'))">
+    <DefineConstants>$(DefineConstants);IOS</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\N_m3u8DL-RE.Common\N_m3u8DL-RE.Common.csproj" />
   </ItemGroup>
