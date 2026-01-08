@@ -1,0 +1,35 @@
+{
+    "testStreams": [
+        {
+            "name": "Apple Basic",
+            "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8",
+            "type": "hls"
+        },
+        {
+            "name": "Apple Advanced HEVC",
+            "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8",
+            "type": "hls"
+        },
+        {
+            "name": "DASH Clear",
+            "url": "https://media.axprod.net/TestVectors/v7-Clear/Manifest_1080p.mpd",
+            "type": "dash"
+        },
+        {
+            "name": "DASH Multi Resolution",
+            "url": "https://dash.akamaized.net/dash264/TestCases/2c/qualcomm/1/MultiResMPEG2.mpd",
+            "type": "dash"
+        },
+        {
+            "name": "HLS VTT",
+            "url": "https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/hls.m3u8",
+            "type": "hls"
+        },
+        {
+            "name": "HLS AES Encrypted",
+            "url": "http://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8",
+            "type": "hls",
+            "encrypted": true
+        }
+    ]
+}
