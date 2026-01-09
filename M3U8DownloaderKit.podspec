@@ -68,7 +68,7 @@ Pod::Spec.new do |spec|
     core.vendored_frameworks = "build/xcframework/M3U8Core.xcframework"
     
     # Objective-C 源文件（不包含VideoMerge）
-    core.source_files = "Sources/M3U8DownloaderKitObjC/*.{h,m}"
+    core.source_files = "Sources/M3U8DownloaderKitObjC/*.{h,m}", "Sources/M3U8DownloaderKitObjC/include/*.h"
     
     # 公开头文件
     core.public_header_files = "Sources/M3U8DownloaderKitObjC/include/*.h"

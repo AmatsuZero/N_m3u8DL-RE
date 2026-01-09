@@ -15,15 +15,15 @@ FOUNDATION_EXPORT double M3U8VideoMergeVersionNumber;
 FOUNDATION_EXPORT const unsigned char M3U8VideoMergeVersionString[];
 
 // 核心协议和接口
-#import <M3U8DownloaderKitObjC/M3U8VideoProcessor.h>
-#import <M3U8DownloaderKitObjC/M3U8CancellationToken.h>
-#import <M3U8DownloaderKitObjC/M3U8MergeOptions.h>
-#import <M3U8DownloaderKitObjC/M3U8MergeRequest.h>
-#import <M3U8DownloaderKitObjC/M3U8MergeResult.h>
-#import <M3U8DownloaderKitObjC/M3U8MergeStatistics.h>
+#import "M3U8VideoProcessor.h"
+#import "M3U8CancellationToken.h"
+#import "M3U8MergeOptions.h"
+#import "M3U8MergeRequest.h"
+#import "M3U8MergeResult.h"
+#import "M3U8MergeStatistics.h"
 
 // 处理器注册表
-#import <M3U8DownloaderKitObjC/M3U8VideoProcessorRegistry.h>
+#import "M3U8VideoProcessorRegistry.h"
 
 // AVFoundation处理器
-#import <M3U8DownloaderKitObjC/M3U8AVFoundationProcessor.h>
+#import "M3U8AVFoundationProcessor.h"

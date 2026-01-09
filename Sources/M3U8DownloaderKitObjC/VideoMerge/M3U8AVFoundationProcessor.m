@@ -609,11 +609,8 @@
         
         AVMutableVideoCompositionLayerInstruction *layerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:videoTrack];
         
-        // 获取源视频尺寸
-        CGSize sourceSize = segment.sourceURL ? CGSizeZero : videoTrack.naturalSize;
-        if (CGSizeEqualToSize(sourceSize, CGSizeZero)) {
-            sourceSize = videoTrack.naturalSize;
-        }
+        // 使用轨道的自然尺寸
+        CGSize sourceSize = videoTrack.naturalSize;
         
         // 计算缩放变换
         CGAffineTransform transform = [self calculateTransformFromSize:sourceSize

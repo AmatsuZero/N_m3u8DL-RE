@@ -85,7 +85,10 @@ let package = Package(
         // 注意：由于依赖 XCFramework，测试需要在真实设备或模拟器上运行
         .testTarget(
             name: "M3U8DownloaderKitTests",
-            dependencies: ["M3U8DownloaderKit"],
+            dependencies: [
+                "M3U8DownloaderKit",
+                "M3U8VideoMerge"
+            ],
             path: "Tests/M3U8DownloaderKitTests",
             resources: [
                 .copy("Resources")
