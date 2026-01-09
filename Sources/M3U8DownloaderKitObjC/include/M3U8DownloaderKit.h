@@ -21,6 +21,25 @@ FOUNDATION_EXPORT double M3U8DownloaderKitVersionNumber;
 FOUNDATION_EXPORT const unsigned char M3U8DownloaderKitVersionString[];
 
 // 导入所有公开头文件
+#if __has_include(<M3U8DownloaderKit/M3U8Downloader.h>)
+#import <M3U8DownloaderKit/M3U8Downloader.h>
+#else
 #import "M3U8Downloader.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8Types.h>)
+#import <M3U8DownloaderKit/M3U8Types.h>
+#else
 #import "M3U8Types.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8Error.h>)
+#import <M3U8DownloaderKit/M3U8Error.h>
+#else
 #import "M3U8Error.h"
+#endif
+
+// C语言接口
+#if __has_include(<M3U8DownloaderKit/m3u8dl.h>)
+#import <M3U8DownloaderKit/m3u8dl.h>
+#else
+#import "m3u8dl.h"
+#endif

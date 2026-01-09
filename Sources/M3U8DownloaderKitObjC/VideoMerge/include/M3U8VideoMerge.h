@@ -15,15 +15,47 @@ FOUNDATION_EXPORT double M3U8VideoMergeVersionNumber;
 FOUNDATION_EXPORT const unsigned char M3U8VideoMergeVersionString[];
 
 // 核心协议和接口
+#if __has_include(<M3U8DownloaderKit/M3U8VideoProcessor.h>)
+#import <M3U8DownloaderKit/M3U8VideoProcessor.h>
+#else
 #import "M3U8VideoProcessor.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8CancellationToken.h>)
+#import <M3U8DownloaderKit/M3U8CancellationToken.h>
+#else
 #import "M3U8CancellationToken.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8MergeOptions.h>)
+#import <M3U8DownloaderKit/M3U8MergeOptions.h>
+#else
 #import "M3U8MergeOptions.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8MergeRequest.h>)
+#import <M3U8DownloaderKit/M3U8MergeRequest.h>
+#else
 #import "M3U8MergeRequest.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8MergeResult.h>)
+#import <M3U8DownloaderKit/M3U8MergeResult.h>
+#else
 #import "M3U8MergeResult.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8MergeStatistics.h>)
+#import <M3U8DownloaderKit/M3U8MergeStatistics.h>
+#else
 #import "M3U8MergeStatistics.h"
+#endif
 
 // 处理器注册表
+#if __has_include(<M3U8DownloaderKit/M3U8VideoProcessorRegistry.h>)
+#import <M3U8DownloaderKit/M3U8VideoProcessorRegistry.h>
+#else
 #import "M3U8VideoProcessorRegistry.h"
+#endif
 
 // AVFoundation处理器
+#if __has_include(<M3U8DownloaderKit/M3U8AVFoundationProcessor.h>)
+#import <M3U8DownloaderKit/M3U8AVFoundationProcessor.h>
+#else
 #import "M3U8AVFoundationProcessor.h"
+#endif

@@ -6,8 +6,16 @@
 //
 
 #import <Foundation/Foundation.h>
+#if __has_include(<M3U8DownloaderKit/M3U8Types.h>)
+#import <M3U8DownloaderKit/M3U8Types.h>
+#else
 #import "M3U8Types.h"
+#endif
+#if __has_include(<M3U8DownloaderKit/M3U8Error.h>)
+#import <M3U8DownloaderKit/M3U8Error.h>
+#else
 #import "M3U8Error.h"
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 

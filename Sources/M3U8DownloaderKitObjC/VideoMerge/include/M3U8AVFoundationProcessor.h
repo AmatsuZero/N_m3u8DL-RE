@@ -7,7 +7,11 @@
 //
 
 #import <Foundation/Foundation.h>
+#if __has_include(<M3U8DownloaderKit/M3U8VideoProcessor.h>)
+#import <M3U8DownloaderKit/M3U8VideoProcessor.h>
+#else
 #import "M3U8VideoProcessor.h"
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 
