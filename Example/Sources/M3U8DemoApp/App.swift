@@ -1,5 +1,5 @@
 //
-//  main.swift
+//  App.swift
 //  M3U8DemoApp
 //
 //  M3U8DownloaderKit 命令行演示应用
@@ -9,10 +9,9 @@
 import Foundation
 
 // 导入 Objective-C 封装层
-// 在 SPM 环境中使用 M3U8DownloaderKitObjC
-// 在 CocoaPods 环境中使用 M3U8DownloaderKit (umbrella header)
-#if canImport(M3U8DownloaderKitObjC)
-import M3U8DownloaderKitObjC
+// SPM 和 CocoaPods 环境统一使用 M3U8DownloaderKit
+#if canImport(M3U8DownloaderKit)
+import M3U8DownloaderKit
 #endif
 
 /// 主应用程序入口
@@ -54,7 +53,7 @@ final class DemoRunner {
     
     // MARK: - Properties
     
-    #if canImport(M3U8DownloaderKitObjC)
+    #if canImport(M3U8DownloaderKit)
     private var downloader: M3U8Downloader?
     #endif
     
@@ -63,7 +62,7 @@ final class DemoRunner {
     func run() {
         printBanner()
         
-        #if canImport(M3U8DownloaderKitObjC)
+        #if canImport(M3U8DownloaderKit)
         // 初始化下载器
         guard initializeDownloader() else {
             printError("下载器初始化失败，程序退出")
@@ -73,25 +72,30 @@ final class DemoRunner {
         // 显示主菜单
         mainMenu()
         #else
-        printError("M3U8DownloaderKitObjC 模块未找到")
+        printError("M3U8DownloaderKit 模块未找到")
         printInfo("请确保已正确配置 XCFramework 和 Pod 依赖")
         #endif
     }
     
     // MARK: - Initialization
     
-    #if canImport(M3U8DownloaderKitObjC)
+    #if canImport(M3U8DownloaderKit)
     private func initializeDownloader() -> Bool {
         printSection("初始化下载器")
         
         // 创建配置
-        let config = M3U8Configuration()
-        config.maxConcurrency = 8
-        config.timeoutSeconds = 30
-        config.retryCount = 3
+        let config = M3U8Configuration.default()
+        config.threadCount = 8
+        config.connectionTimeout = 30
+        config.maxRetryCount = 3
         
         // 初始化下载器
-        downloader = M3U8Downloader(configuration: config)
+        do {
+            downloader = try M3U8Downloader(configuration: config)
+        } catch {
+            printError("下载器初始化失败: \(error.localizedDescription)")
+            return false
+        }
         
         guard let downloader = downloader else {
             printError("下载器初始化失败")
@@ -99,15 +103,8 @@ final class DemoRunner {
         }
         
         // 设置日志回调
-        downloader.logCallback = { [weak self] level, message in
-            self?.printLog(level: level, message: message ?? "")
-        }
-        
-        // 设置进度回调
-        downloader.progressCallback = { [weak self] progress in
-            if let progress = progress {
-                self?.printProgress(progress)
-            }
+        downloader.setLogHandler { [weak self] level, message in
+            self?.printLog(level: level, message: message)
         }
         
         printSuccess("下载器初始化成功")
@@ -118,7 +115,7 @@ final class DemoRunner {
     
     // MARK: - Menu
     
-    #if canImport(M3U8DownloaderKitObjC)
+    #if canImport(M3U8DownloaderKit)
     private func mainMenu() {
         while true {
             printSection("主菜单")
@@ -246,7 +243,7 @@ final class DemoRunner {
         let semaphore = DispatchSemaphore(value: 0)
         let startTime = Date()
         
-        downloader.parse(url) { [weak self] result, error in
+        downloader.parseURL(url) { [weak self] result, error in
             defer { semaphore.signal() }
             
             let elapsed = Date().timeIntervalSince(startTime)
@@ -257,12 +254,18 @@ final class DemoRunner {
             }
             
             guard let result = result, result.success else {
-                self?.printError("解析失败: 未知错误")
+                self?.printError("解析失败: \(result?.errorMessage ?? "未知错误")")
                 return
             }
             
             self?.printSuccess("解析成功! 耗时: \(String(format: "%.2f", elapsed))s")
             self?.printInfo("找到 \(result.streams.count) 个流:")
+            
+            if result.isLive {
+                self?.printInfo("类型: 直播流")
+            } else if result.duration > 0 {
+                self?.printInfo("时长: \(String(format: "%.1f", result.duration))s")
+            }
             
             for (index, stream) in result.streams.enumerated() {
                 var details: [String] = []
@@ -275,8 +278,6 @@ final class DemoRunner {
                     details.append("音频")
                 case .subtitle:
                     details.append("字幕")
-                case .unknown:
-                    details.append("未知")
                 @unknown default:
                     details.append("其他")
                 }
@@ -286,14 +287,14 @@ final class DemoRunner {
                     details.append(resolution)
                 }
                 
-                // 编码
-                if let codec = stream.codec, !codec.isEmpty {
-                    details.append(codec)
+                // 编解码器
+                if let codecs = stream.codecs, !codecs.isEmpty {
+                    details.append(codecs)
                 }
                 
-                // 码率
-                if stream.bitrate > 0 {
-                    details.append("\(stream.bitrate / 1000) kbps")
+                // 带宽
+                if stream.bandwidth > 0 {
+                    details.append("\(stream.bandwidth / 1000) kbps")
                 }
                 
                 // 语言
@@ -301,13 +302,13 @@ final class DemoRunner {
                     details.append(language)
                 }
                 
-                // 加密状态
-                if stream.isEncrypted {
-                    details.append("🔒 加密")
+                // 名称
+                if let name = stream.name, !name.isEmpty {
+                    details.append(name)
                 }
                 
                 let detailsStr = details.joined(separator: " | ")
-                print("  \(index + 1). [\(stream.streamId ?? "N/A")] \(detailsStr)")
+                print("  \(index + 1). \(detailsStr)")
             }
         }
         
@@ -334,44 +335,54 @@ final class DemoRunner {
         let semaphore = DispatchSemaphore(value: 0)
         let startTime = Date()
         
-        let options = M3U8DownloadOptions()
+        let options = M3U8DownloadOptions.default()
         options.autoSelectBestQuality = true
         
-        downloader.download(url, to: outputPath, options: options) { [weak self] result, error in
-            defer { semaphore.signal() }
-            
-            let elapsed = Date().timeIntervalSince(startTime)
-            
-            if let error = error {
-                if (error as NSError).code == M3U8ErrorCodeCancelled {
-                    self?.printWarning("下载已取消")
-                } else {
-                    self?.printError("下载失败: \(error.localizedDescription)")
+        downloader.downloadURL(
+            url,
+            toPath: outputPath,
+            options: options,
+            progress: { [weak self] progress in
+                self?.printProgress(progress)
+            },
+            completion: { [weak self] result, error in
+                defer { semaphore.signal() }
+                
+                let elapsed = Date().timeIntervalSince(startTime)
+                
+                if let error = error as NSError? {
+                    // M3U8ErrorCodeCancelled = 3001
+                    if error.domain == M3U8ErrorDomain && error.code == 3001 {
+                        self?.printWarning("下载已取消")
+                    } else {
+                        self?.printError("下载失败: \(error.localizedDescription)")
+                    }
+                    return
                 }
-                return
+                
+                guard let result = result, result.success else {
+                    self?.printError("下载失败: \(result?.errorMessage ?? "未知错误")")
+                    return
+                }
+                
+                print() // 换行（进度条后）
+                self?.printSuccess("下载完成! 耗时: \(String(format: "%.2f", elapsed))s")
+                
+                if let outputFile = result.outputFile {
+                    self?.printInfo("文件: \(outputFile)")
+                }
+                
+                if result.fileSize > 0 {
+                    let formattedSize = self?.formatFileSize(result.fileSize) ?? "\(result.fileSize) bytes"
+                    self?.printInfo("大小: \(formattedSize)")
+                }
+                
+                if result.duration > 0 {
+                    let formattedDuration = self?.formatDuration(result.duration) ?? "\(result.duration)s"
+                    self?.printInfo("时长: \(formattedDuration)")
+                }
             }
-            
-            guard let result = result, result.success else {
-                self?.printError("下载失败: 未知错误")
-                return
-            }
-            
-            self?.printSuccess("下载完成! 耗时: \(String(format: "%.2f", elapsed))s")
-            
-            if let outputFile = result.outputFile {
-                self?.printInfo("文件: \(outputFile)")
-            }
-            
-            if result.fileSize > 0 {
-                let formattedSize = self?.formatFileSize(result.fileSize) ?? "\(result.fileSize) bytes"
-                self?.printInfo("大小: \(formattedSize)")
-            }
-            
-            if result.duration > 0 {
-                let formattedDuration = self?.formatDuration(result.duration) ?? "\(result.duration)s"
-                self?.printInfo("时长: \(formattedDuration)")
-            }
-        }
+        )
         
         semaphore.wait()
     }
@@ -385,9 +396,40 @@ final class DemoRunner {
                 printError("下载器状态: 已释放")
             } else {
                 printSuccess("下载器状态: 已初始化")
+                
+                // 显示当前状态
+                let status = downloader.currentStatus
+                let statusStr: String
+                switch status {
+                case .idle:
+                    statusStr = "空闲"
+                case .parsing:
+                    statusStr = "解析中"
+                case .downloading:
+                    statusStr = "下载中"
+                case .merging:
+                    statusStr = "合并中"
+                case .completed:
+                    statusStr = "已完成"
+                case .failed:
+                    statusStr = "失败"
+                case .cancelled:
+                    statusStr = "已取消"
+                @unknown default:
+                    statusStr = "未知"
+                }
+                printInfo("当前状态: \(statusStr)")
             }
         } else {
             printError("下载器状态: 未初始化")
+        }
+        
+        // 显示版本信息
+        if let versionInfo = M3U8Downloader.versionInfo() {
+            printInfo("库版本: \(versionInfo.version)")
+            if !versionInfo.supportedFeatures.isEmpty {
+                printInfo("支持功能: \(versionInfo.supportedFeatures.joined(separator: ", "))")
+            }
         }
     }
     
@@ -452,7 +494,7 @@ final class DemoRunner {
         print(" ❌ \(message)")
     }
     
-    #if canImport(M3U8DownloaderKitObjC)
+    #if canImport(M3U8DownloaderKit)
     private func printLog(level: M3U8LogLevel, message: String) {
         let symbol: String
         switch level {
@@ -460,7 +502,7 @@ final class DemoRunner {
             symbol = "🔍"
         case .info:
             symbol = "ℹ️"
-        case .warning:
+        case .warn:
             symbol = "⚠️"
         case .error:
             symbol = "❌"
@@ -471,21 +513,24 @@ final class DemoRunner {
     }
     
     private func printProgress(_ progress: M3U8DownloadProgress) {
-        let bar = createProgressBar(percentage: progress.percentage)
-        let speed = formatSpeed(progress.bytesPerSecond)
-        print("\r \(bar) \(String(format: "%.1f%%", progress.percentage)) | \(speed)", terminator: "")
-        fflush(stdout)
+        let percentage = Double(progress.percentage)
+        let bar = createProgressBar(percentage: percentage)
+        let speed = formatSpeed(Double(progress.speed))
         
-        if progress.percentage >= 100 {
-            print() // 换行
+        var statusStr = ""
+        if let task = progress.currentTask, !task.isEmpty {
+            statusStr = " | \(task)"
         }
+        
+        print("\r \(bar) \(String(format: "%.1f%%", percentage)) | \(speed)\(statusStr)", terminator: "")
+        fflush(stdout)
     }
     #endif
     
     private func createProgressBar(percentage: Double, width: Int = 30) -> String {
         let filled = Int(percentage / 100.0 * Double(width))
         let empty = width - filled
-        return "[" + String(repeating: "█", count: filled) + String(repeating: "░", count: empty) + "]"
+        return "[" + String(repeating: "█", count: max(0, filled)) + String(repeating: "░", count: max(0, empty)) + "]"
     }
     
     private func formatFileSize(_ bytes: Int64) -> String {
@@ -502,9 +547,10 @@ final class DemoRunner {
     }
     
     private func formatDuration(_ seconds: Double) -> String {
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        let secs = Int(seconds) % 60
+        let totalSeconds = Int(seconds)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let secs = totalSeconds % 60
         
         if hours > 0 {
             return String(format: "%d:%02d:%02d", hours, minutes, secs)

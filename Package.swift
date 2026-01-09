@@ -26,7 +26,7 @@ let package = Package(
         // 主要库产品 - Objective-C 实现
         .library(
             name: "M3U8DownloaderKit",
-            targets: ["M3U8DownloaderKitObjC"]
+            targets: ["M3U8DownloaderKit"]
         ),
     ],
     dependencies: [
@@ -43,7 +43,7 @@ let package = Package(
         // Objective-C 封装层
         // 直接调用 M3U8Core.xcframework 中的 C API
         .target(
-            name: "M3U8DownloaderKitObjC",
+            name: "M3U8DownloaderKit",
             dependencies: ["M3U8Core"],
             path: "Sources/M3U8DownloaderKitObjC",
             publicHeadersPath: "include",
@@ -62,7 +62,7 @@ let package = Package(
         // 注意：由于依赖 XCFramework，测试需要在真实设备或模拟器上运行
         .testTarget(
             name: "M3U8DownloaderKitTests",
-            dependencies: ["M3U8DownloaderKitObjC"],
+            dependencies: ["M3U8DownloaderKit"],
             path: "Tests/M3U8DownloaderKitTests",
             resources: [
                 .copy("Resources")
