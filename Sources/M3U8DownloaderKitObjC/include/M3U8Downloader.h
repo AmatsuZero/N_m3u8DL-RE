@@ -85,7 +85,7 @@ typedef void (^M3U8DownloadCompletionBlock)(M3U8DownloadResult * _Nullable resul
 ///     }
 /// }];
 /// @endcode
-@interface M3U8Downloader : NSObject
+@interface M3U8Downloader : NSObject<NSProgressReporting>
 
 #pragma mark - 属性
 

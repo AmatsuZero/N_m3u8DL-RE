@@ -36,6 +36,12 @@
 /// 状态锁
 @property (nonatomic, strong) NSLock *lock;
 
+/// 复用线程
+@property (nonatomic, strong) NSOperationQueue *queue;
+
+/// NSProgressReporting 协议要求的进度对象
+@property (nonatomic, strong, readwrite) NSProgress *progress;
+
 /// 处理进度回调
 - (void)handleProgress:(M3U8DownloadProgress *)progress;
 
@@ -176,14 +182,19 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
 }
 
 - (instancetype)initWithConfiguration:(M3U8Configuration *)configuration error:(NSError **)error {
-    self = [super init];
-    if (self) {
+    if (self = [super init]) {
         // 设置全局回调
         [[self class] setupGlobalCallbacks];
         
         _lock = [[NSLock alloc] init];
         _isDisposed = NO;
         _currentStatus = M3U8DownloadStatusIdle;
+        
+        // 初始化 NSProgress 对象
+        _progress = [NSProgress progressWithTotalUnitCount:100];
+        _progress.kind = NSProgressKindFile;
+        _progress.cancellable = YES;
+        _progress.pausable = NO;
         
         // 初始化 C 库
         const char *configJson = NULL;
@@ -204,6 +215,9 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
         
         // 注册实例
         [[self class] registerInstance:self];
+        
+        _queue = [[NSOperationQueue alloc] init];
+        _queue.name = [NSString stringWithFormat:@"com.m3u8.downloader.serial.%@", @(instanceId)];
     }
     return self;
 }
@@ -255,15 +269,12 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
 
 - (void)parseURL:(NSString *)url completion:(M3U8ParseCompletionBlock)completion {
     if (!completion) return;
-    
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    __typeof(self) __weak weakSelf = self;
+    [self.queue addOperationWithBlock:^{
         NSError *error = nil;
-        M3U8ParseResult *result = [self parseURL:url error:&error];
-        
-        dispatch_async(dispatch_get_main_queue(), ^{
-            completion(result, error);
-        });
-    });
+        M3U8ParseResult *result = [weakSelf parseURL:url error:&error];
+        completion(result, error);
+    }];
 }
 
 #pragma mark - 下载方法
@@ -316,12 +327,18 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     
     [self.lock lock];
     self.currentStatus = M3U8DownloadStatusDownloading;
+    // 重置进度
+    self.progress.completedUnitCount = 0;
     [self.lock unlock];
     
     char *resultPtr = m3u8dl_download(self.instanceId, [requestJson UTF8String]);
     
     [self.lock lock];
     self.currentStatus = M3U8DownloadStatusIdle;
+    // 标记进度完成
+    if (self.progress.completedUnitCount < self.progress.totalUnitCount) {
+        self.progress.completedUnitCount = self.progress.totalUnitCount;
+    }
     [self.lock unlock];
     
     if (!resultPtr) {
@@ -365,7 +382,7 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     self.completionBlock = completion;
     [self.lock unlock];
     
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    [self.queue addOperationWithBlock:^{
         NSError *error = nil;
         M3U8DownloadResult *result = [self downloadURL:url toPath:outputPath options:options error:&error];
         
@@ -375,12 +392,8 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
         self.completionBlock = nil;
         [self.lock unlock];
         
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (savedCompletion) {
-                savedCompletion(result, error);
-            }
-        });
-    });
+        savedCompletion(result, error);
+    }];
 }
 
 #pragma mark - 控制方法
@@ -391,11 +404,13 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     [self.lock unlock];
     
     if (disposed) return;
-    
+    [self.queue cancelAllOperations];
     m3u8dl_cancel(self.instanceId);
     
     [self.lock lock];
     self.currentStatus = M3U8DownloadStatusCancelled;
+    // 取消进度
+    [self.progress cancel];
     [self.lock unlock];
 }
 
@@ -486,31 +501,40 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
 - (void)handleProgress:(M3U8DownloadProgress *)progress {
     [self.lock lock];
     self.currentStatus = progress.status;
+    
+    // 更新 NSProgress 对象
+    if (progress.percentage >= 0 && progress.percentage <= 100) {
+        self.progress.completedUnitCount = progress.percentage;
+    }
+    
     M3U8ProgressBlock block = self.progressBlock;
     id<M3U8DownloaderDelegate> delegate = self.delegate;
     [self.lock unlock];
     
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (block) {
-            block(progress);
-        }
-        if ([delegate respondsToSelector:@selector(downloader:didUpdateProgress:)]) {
-            [delegate downloader:self didUpdateProgress:progress];
-        }
-    });
+    if (block) {
+        block(progress);
+    }
+    
+    if ([delegate respondsToSelector:@selector(downloader:didUpdateProgress:)]) {
+        [delegate downloader:self didUpdateProgress:progress];
+    }
 }
 
 - (void)handleCompletion:(M3U8DownloadResult *)result {
     [self.lock lock];
     self.currentStatus = result.success ? M3U8DownloadStatusCompleted : M3U8DownloadStatusFailed;
+    
+    // 完成或失败时，确保进度达到 100%
+    if (result.success) {
+        self.progress.completedUnitCount = self.progress.totalUnitCount;
+    }
+    
     id<M3U8DownloaderDelegate> delegate = self.delegate;
     [self.lock unlock];
     
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if ([delegate respondsToSelector:@selector(downloader:didFinishWithResult:)]) {
-            [delegate downloader:self didFinishWithResult:result];
-        }
-    });
+    if ([delegate respondsToSelector:@selector(downloader:didFinishWithResult:)]) {
+        [delegate downloader:self didFinishWithResult:result];
+    }
 }
 
 - (void)handleLog:(M3U8LogLevel)level message:(NSString *)message {
@@ -519,14 +543,12 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     id<M3U8DownloaderDelegate> delegate = self.delegate;
     [self.lock unlock];
     
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (block) {
-            block(level, message);
-        }
-        if ([delegate respondsToSelector:@selector(downloader:didLogWithLevel:message:)]) {
-            [delegate downloader:self didLogWithLevel:level message:message];
-        }
-    });
+    if (block) {
+        block(level, message);
+    }
+    if ([delegate respondsToSelector:@selector(downloader:didLogWithLevel:message:)]) {
+        [delegate downloader:self didLogWithLevel:level message:message];
+    }
 }
 
 @end
