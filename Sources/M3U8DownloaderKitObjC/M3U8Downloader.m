@@ -218,6 +218,8 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
         
         _queue = [[NSOperationQueue alloc] init];
         _queue.name = [NSString stringWithFormat:@"com.m3u8.downloader.serial.%@", @(instanceId)];
+        _queue.maxConcurrentOperationCount = 1; // 串行队列
+        _queue.qualityOfService = NSQualityOfServiceUserInitiated;
     }
     return self;
 }
@@ -271,12 +273,25 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     if (!completion) return;
     __typeof(self) __weak weakSelf = self;
     [self.queue addOperationWithBlock:^{
+        __typeof(weakSelf) __strong strongSelf = weakSelf;
+        if (!strongSelf) {
+            // 对象已释放，直接返回错误
+            NSError *error = M3U8ErrorMake(M3U8ErrorCodeDisposed, @"Downloader has been disposed");
+            dispatch_async(dispatch_get_main_queue(), ^{
+                completion(nil, error);
+            });
+            return;
+        }
+        
         NSError *error = nil;
-        M3U8ParseResult *result = [weakSelf parseURL:url error:&error];
-        completion(result, error);
+        M3U8ParseResult *result = [strongSelf parseURL:url error:&error];
+        
+        // 在主线程回调
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(result, error);
+        });
     }];
 }
-
 #pragma mark - 下载方法
 
 - (M3U8DownloadResult *)downloadURL:(NSString *)url
@@ -329,6 +344,10 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     self.currentStatus = M3U8DownloadStatusDownloading;
     // 重置进度
     self.progress.completedUnitCount = 0;
+    // 设置文件 URL
+    if (outputPath) {
+        self.progress.fileURL = [NSURL fileURLWithPath:outputPath];
+    }
     [self.lock unlock];
     
     char *resultPtr = m3u8dl_download(self.instanceId, [requestJson UTF8String]);
@@ -382,17 +401,29 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     self.completionBlock = completion;
     [self.lock unlock];
     
+    __typeof(self) __weak weakSelf = self;
     [self.queue addOperationWithBlock:^{
+        __typeof(weakSelf) __strong strongSelf = weakSelf;
+        if (!strongSelf) {
+            // 对象已释放，直接返回错误
+            NSError *error = M3U8ErrorMake(M3U8ErrorCodeDisposed, @"Downloader has been disposed");
+            completion(nil, error);
+            return;
+        }
+        
         NSError *error = nil;
-        M3U8DownloadResult *result = [self downloadURL:url toPath:outputPath options:options error:&error];
+        M3U8DownloadResult *result = [strongSelf downloadURL:url toPath:outputPath options:options error:&error];
         
-        [self.lock lock];
-        self.progressBlock = nil;
-        M3U8DownloadCompletionBlock savedCompletion = self.completionBlock;
-        self.completionBlock = nil;
-        [self.lock unlock];
+        [strongSelf.lock lock];
+        strongSelf.progressBlock = nil;
+        M3U8DownloadCompletionBlock savedCompletion = strongSelf.completionBlock;
+        strongSelf.completionBlock = nil;
+        [strongSelf.lock unlock];
         
-        savedCompletion(result, error);
+        // 在主线程回调
+        dispatch_async(dispatch_get_main_queue(), ^{
+            savedCompletion(result, error);
+        });
     }];
 }
 
@@ -422,7 +453,12 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     }
     self.isDisposed = YES;
     m3u8dl_instance_t instanceId = self.instanceId;
+    NSOperationQueue *queue = self.queue;
     [self.lock unlock];
+    
+    // 取消所有操作并等待完成
+    [queue cancelAllOperations];
+    [queue waitUntilAllOperationsAreFinished];
     
     [[self class] unregisterInstance:instanceId];
     m3u8dl_dispose(instanceId);
@@ -502,22 +538,86 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     [self.lock lock];
     self.currentStatus = progress.status;
     
-    // 更新 NSProgress 对象
+    // 更新 NSProgress 对象 - 基础进度
     if (progress.percentage >= 0 && progress.percentage <= 100) {
         self.progress.completedUnitCount = progress.percentage;
+    }
+    
+    // 更新文件相关信息
+    if (progress.totalBytes > 0) {
+        // 使用字节数作为更精确的进度单位
+        self.progress.totalUnitCount = progress.totalBytes;
+        self.progress.completedUnitCount = progress.downloadedBytes;
+    }
+    
+    // 设置文件数量信息（分片数）
+    if (progress.totalSegments > 0) {
+        self.progress.fileTotalCount = @(progress.totalSegments);
+        self.progress.fileCompletedCount = @(progress.downloadedSegments);
+    }
+    
+    // 计算预计剩余时间
+    if (progress.speed > 0 && progress.totalBytes > 0) {
+        int64_t remainingBytes = progress.totalBytes - progress.downloadedBytes;
+        if (remainingBytes > 0) {
+            NSTimeInterval estimatedTime = (double)remainingBytes / (double)progress.speed;
+            self.progress.estimatedTimeRemaining = @(estimatedTime);
+        }
+    }
+    
+    // 设置吞吐量（下载速度）
+    if (progress.speed > 0) {
+        self.progress.throughput = @(progress.speed);
+    }
+    
+    // 设置本地化描述
+    NSString *statusText = [self statusTextForStatus:progress.status];
+    if (progress.currentTask && progress.currentTask.length > 0) {
+        self.progress.localizedDescription = [NSString stringWithFormat:@"%@ - %@", statusText, progress.currentTask];
+    } else {
+        self.progress.localizedDescription = statusText;
+    }
+    
+    // 设置详细的附加描述
+    NSMutableString *additionalDesc = [NSMutableString string];
+    
+    // 添加速度信息
+    if (progress.speed > 0) {
+        NSString *speedText = [self formatBytes:progress.speed perSecond:YES];
+        [additionalDesc appendFormat:@"速度: %@", speedText];
+    }
+    
+    // 添加大小信息
+    if (progress.totalBytes > 0) {
+        NSString *downloadedText = [self formatBytes:progress.downloadedBytes perSecond:NO];
+        NSString *totalText = [self formatBytes:progress.totalBytes perSecond:NO];
+        if (additionalDesc.length > 0) [additionalDesc appendString:@" | "];
+        [additionalDesc appendFormat:@"已下载: %@ / %@", downloadedText, totalText];
+    }
+    
+    // 添加分片信息
+    if (progress.totalSegments > 0) {
+        if (additionalDesc.length > 0) [additionalDesc appendString:@" | "];
+        [additionalDesc appendFormat:@"分片: %ld/%ld", (long)progress.downloadedSegments, (long)progress.totalSegments];
+    }
+    
+    if (additionalDesc.length > 0) {
+        self.progress.localizedAdditionalDescription = additionalDesc;
     }
     
     M3U8ProgressBlock block = self.progressBlock;
     id<M3U8DownloaderDelegate> delegate = self.delegate;
     [self.lock unlock];
     
-    if (block) {
-        block(progress);
-    }
-    
-    if ([delegate respondsToSelector:@selector(downloader:didUpdateProgress:)]) {
-        [delegate downloader:self didUpdateProgress:progress];
-    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (block) {
+            block(progress);
+        }
+        if ([delegate respondsToSelector:@selector(downloader:didUpdateProgress:)]) {
+            [delegate downloader:self didUpdateProgress:progress];
+        }
+    });
+
 }
 
 - (void)handleCompletion:(M3U8DownloadResult *)result {
@@ -543,12 +643,68 @@ static void globalLogCallback(m3u8dl_log_level_t level, const char *message) {
     id<M3U8DownloaderDelegate> delegate = self.delegate;
     [self.lock unlock];
     
-    if (block) {
-        block(level, message);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (block) {
+            block(level, message);
+        }
+        if ([delegate respondsToSelector:@selector(downloader:didLogWithLevel:message:)]) {
+            [delegate downloader:self didLogWithLevel:level message:message];
+        }
+    });
+}
+
+#pragma mark - 辅助方法
+
+/// 将状态转换为文本描述
+- (NSString *)statusTextForStatus:(M3U8DownloadStatus)status {
+    switch (status) {
+        case M3U8DownloadStatusIdle:
+            return @"空闲";
+        case M3U8DownloadStatusParsing:
+            return @"解析中";
+        case M3U8DownloadStatusDownloading:
+            return @"下载中";
+        case M3U8DownloadStatusMerging:
+            return @"合并中";
+        case M3U8DownloadStatusCompleted:
+            return @"已完成";
+        case M3U8DownloadStatusFailed:
+            return @"失败";
+        case M3U8DownloadStatusCancelled:
+            return @"已取消";
+        default:
+            return @"未知状态";
     }
-    if ([delegate respondsToSelector:@selector(downloader:didLogWithLevel:message:)]) {
-        [delegate downloader:self didLogWithLevel:level message:message];
+}
+
+/// 格式化字节数为可读字符串
+- (NSString *)formatBytes:(int64_t)bytes perSecond:(BOOL)perSecond {
+    static NSArray<NSString *> *units = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        units = @[@"B", @"KB", @"MB", @"GB", @"TB"];
+    });
+    
+    double size = (double)bytes;
+    NSInteger unitIndex = 0;
+    
+    while (size >= 1024.0 && unitIndex < units.count - 1) {
+        size /= 1024.0;
+        unitIndex++;
     }
+    
+    NSString *formatted;
+    if (unitIndex == 0) {
+        formatted = [NSString stringWithFormat:@"%.0f %@", size, units[unitIndex]];
+    } else {
+        formatted = [NSString stringWithFormat:@"%.2f %@", size, units[unitIndex]];
+    }
+    
+    if (perSecond) {
+        formatted = [formatted stringByAppendingString:@"/s"];
+    }
+    
+    return formatted;
 }
 
 @end
