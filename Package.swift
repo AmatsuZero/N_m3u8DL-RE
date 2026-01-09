@@ -3,7 +3,7 @@
 //  Package.swift
 //  M3U8DownloaderKit
 //
-//  M3U8/HLS/DASH 流媒体下载库的 Swift 包装层
+//  M3U8/HLS/DASH 流媒体下载库的 Objective-C 封装层
 //
 //  支持平台:
 //  - iOS 15.0+
@@ -23,33 +23,34 @@ let package = Package(
         .macOS(.v12)
     ],
     products: [
-        // 主要库产品
+        // 主要库产品 - Objective-C 实现
         .library(
             name: "M3U8DownloaderKit",
-            targets: ["M3U8DownloaderKit"]
-        ),
-        // 仅模型库（用于测试，不依赖 C 库）
-        .library(
-            name: "M3U8DownloaderKitModels",
-            targets: ["M3U8DownloaderKitModels"]
+            targets: ["M3U8DownloaderKitObjC"]
         ),
     ],
     dependencies: [
         // 外部依赖（如果需要）
     ],
     targets: [
-        // C 桥接模块
+        // M3U8Core - .NET NativeAOT 编译的底层 C 库
+        // 使用 binaryTarget 引入本地 XCFramework
+        .binaryTarget(
+            name: "M3U8Core",
+            path: "build/xcframework/M3U8Core.xcframework"
+        ),
+        
+        // Objective-C 封装层
+        // 直接调用 M3U8Core.xcframework 中的 C API
         .target(
-            name: "M3U8DownloaderKit_C",
-            dependencies: [],
-            path: "Sources/M3U8DownloaderKit_C",
+            name: "M3U8DownloaderKitObjC",
+            dependencies: ["M3U8Core"],
+            path: "Sources/M3U8DownloaderKitObjC",
             publicHeadersPath: "include",
             cSettings: [
                 .headerSearchPath("include")
             ],
             linkerSettings: [
-                // 链接 XCFramework（iOS 和 macOS）
-                .linkedFramework("M3U8DownloaderKit", .when(platforms: [.iOS, .macOS])),
                 .linkedFramework("Foundation"),
                 // 系统库
                 .linkedLibrary("z"),
@@ -57,30 +58,11 @@ let package = Package(
             ]
         ),
         
-        // 纯 Swift 模型层（不依赖 C 库）
-        .target(
-            name: "M3U8DownloaderKitModels",
-            dependencies: [],
-            path: "Sources/M3U8DownloaderKitModels",
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
-        ),
-        
-        // Swift 包装层（完整版，依赖 C 库）
-        .target(
-            name: "M3U8DownloaderKit",
-            dependencies: ["M3U8DownloaderKit_C", "M3U8DownloaderKitModels"],
-            path: "Sources/M3U8DownloaderKit",
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
-        ),
-        
-        // 单元测试（仅测试纯 Swift 模型，不依赖 C 库）
+        // 单元测试
+        // 注意：由于依赖 XCFramework，测试需要在真实设备或模拟器上运行
         .testTarget(
             name: "M3U8DownloaderKitTests",
-            dependencies: ["M3U8DownloaderKitModels"],
+            dependencies: ["M3U8DownloaderKitObjC"],
             path: "Tests/M3U8DownloaderKitTests",
             resources: [
                 .copy("Resources")

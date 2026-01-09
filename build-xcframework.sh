@@ -30,7 +30,9 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 默认选项
 INPUT_DIR="$PROJECT_DIR/build/ios"
 OUTPUT_DIR="$PROJECT_DIR/build/xcframework"
-FRAMEWORK_NAME="M3U8DownloaderKit"
+# 注意：使用 M3U8Core 作为内部 Framework 名称
+# 避免与 CocoaPods 构建的 M3U8DownloaderKit Pod 库名称冲突
+FRAMEWORK_NAME="M3U8Core"
 CLEAN_BEFORE_BUILD=false
 TARGET_PLATFORM="all"  # all, ios, macos
 
@@ -168,23 +170,42 @@ create_framework() {
     local dylib_path=$3
     local framework_dir="$TEMP_DIR/$arch/${FRAMEWORK_NAME}.framework"
     
-    echo "创建 Framework 结构: $framework_dir"
+    echo "创建 Framework 结构: $framework_dir (平台: $platform)"
     
-    # 创建 Framework 目录结构
-    mkdir -p "$framework_dir/Headers"
-    mkdir -p "$framework_dir/Modules"
+    # 确定版本信息
+    local min_version="13.0"
+    local platform_name="iPhoneOS"
+    local supported_platform="iPhoneOS"
     
-    # 复制动态库并重命名
-    cp "$dylib_path" "$framework_dir/$FRAMEWORK_NAME"
+    if [ "$platform" = "iphonesimulator" ]; then
+        platform_name="iPhoneSimulator"
+        supported_platform="iPhoneSimulator"
+    elif [ "$platform" = "macosx" ]; then
+        min_version="12.0"
+        platform_name="MacOSX"
+        supported_platform="MacOSX"
+    fi
     
-    # 修改动态库的 install_name
-    install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME" "$framework_dir/$FRAMEWORK_NAME"
-    
-    # 复制头文件
-    cp "$HEADER_DIR/m3u8dl.h" "$framework_dir/Headers/"
-    
-    # 创建 umbrella header
-    cat > "$framework_dir/Headers/${FRAMEWORK_NAME}.h" << EOF
+    # macOS 使用深层目录结构 (versioned bundle)
+    # iOS 使用浅层目录结构 (shallow bundle)
+    if [ "$platform" = "macosx" ]; then
+        echo "使用 macOS 深层目录结构 (versioned bundle)..."
+        
+        # 创建版本化目录结构
+        local version_dir="$framework_dir/Versions/A"
+        mkdir -p "$version_dir/Headers"
+        mkdir -p "$version_dir/Modules"
+        mkdir -p "$version_dir/Resources"
+        
+        # 复制动态库
+        cp "$dylib_path" "$version_dir/$FRAMEWORK_NAME"
+        install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/Versions/A/$FRAMEWORK_NAME" "$version_dir/$FRAMEWORK_NAME"
+        
+        # 复制头文件
+        cp "$HEADER_DIR/m3u8dl.h" "$version_dir/Headers/"
+        
+        # 创建 umbrella header
+        cat > "$version_dir/Headers/${FRAMEWORK_NAME}.h" << EOF
 //
 //  ${FRAMEWORK_NAME}.h
 //  ${FRAMEWORK_NAME}
@@ -204,8 +225,8 @@ FOUNDATION_EXPORT const unsigned char ${FRAMEWORK_NAME}VersionString[];
 #import <${FRAMEWORK_NAME}/m3u8dl.h>
 EOF
 
-    # 创建 module.modulemap
-    cat > "$framework_dir/Modules/module.modulemap" << EOF
+        # 创建 module.modulemap
+        cat > "$version_dir/Modules/module.modulemap" << EOF
 framework module ${FRAMEWORK_NAME} {
     umbrella header "${FRAMEWORK_NAME}.h"
     
@@ -214,21 +235,96 @@ framework module ${FRAMEWORK_NAME} {
 }
 EOF
 
-    # 创建 Info.plist
-    local min_version="13.0"
-    local platform_name="iPhoneOS"
-    local supported_platform="iPhoneOS"
+        # 创建 Info.plist (在 Resources 目录下)
+        cat > "$version_dir/Resources/Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>${FRAMEWORK_NAME}</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.m3u8dl.${FRAMEWORK_NAME}</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>${FRAMEWORK_NAME}</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>${min_version}</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>${supported_platform}</string>
+    </array>
+</dict>
+</plist>
+EOF
+
+        # 创建 Current 符号链接
+        cd "$framework_dir/Versions"
+        ln -sf A Current
+        cd "$framework_dir"
+        
+        # 创建顶层符号链接
+        ln -sf Versions/Current/Headers Headers
+        ln -sf Versions/Current/Modules Modules
+        ln -sf Versions/Current/Resources Resources
+        ln -sf "Versions/Current/$FRAMEWORK_NAME" "$FRAMEWORK_NAME"
+        
+    else
+        # iOS/模拟器使用浅层目录结构 (shallow bundle)
+        echo "使用 iOS 浅层目录结构 (shallow bundle)..."
+        
+        mkdir -p "$framework_dir/Headers"
+        mkdir -p "$framework_dir/Modules"
+        
+        # 复制动态库并重命名
+        cp "$dylib_path" "$framework_dir/$FRAMEWORK_NAME"
+        install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME" "$framework_dir/$FRAMEWORK_NAME"
+        
+        # 复制头文件
+        cp "$HEADER_DIR/m3u8dl.h" "$framework_dir/Headers/"
+        
+        # 创建 umbrella header
+        cat > "$framework_dir/Headers/${FRAMEWORK_NAME}.h" << EOF
+//
+//  ${FRAMEWORK_NAME}.h
+//  ${FRAMEWORK_NAME}
+//
+//  Auto-generated umbrella header
+//
+
+#import <Foundation/Foundation.h>
+
+//! Project version number for ${FRAMEWORK_NAME}.
+FOUNDATION_EXPORT double ${FRAMEWORK_NAME}VersionNumber;
+
+//! Project version string for ${FRAMEWORK_NAME}.
+FOUNDATION_EXPORT const unsigned char ${FRAMEWORK_NAME}VersionString[];
+
+// Public headers
+#import <${FRAMEWORK_NAME}/m3u8dl.h>
+EOF
+
+        # 创建 module.modulemap
+        cat > "$framework_dir/Modules/module.modulemap" << EOF
+framework module ${FRAMEWORK_NAME} {
+    umbrella header "${FRAMEWORK_NAME}.h"
     
-    if [ "$platform" = "iphonesimulator" ]; then
-        platform_name="iPhoneSimulator"
-        supported_platform="iPhoneSimulator"
-    elif [ "$platform" = "macosx" ]; then
-        min_version="12.0"
-        platform_name="MacOSX"
-        supported_platform="MacOSX"
-    fi
-    
-    cat > "$framework_dir/Info.plist" << EOF
+    export *
+    module * { export * }
+}
+EOF
+
+        # 创建 Info.plist (iOS 使用根目录)
+        cat > "$framework_dir/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -258,6 +354,7 @@ EOF
 </dict>
 </plist>
 EOF
+    fi
 
     echo "✅ Framework 创建完成: $framework_dir"
 }
@@ -345,8 +442,9 @@ create_simulator_universal_framework() {
 
 # 创建macOS通用 Framework（合并arm64和x64）
 create_macos_universal_framework() {
-    local macos_arm64_fw="$TEMP_DIR/osx-arm64/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME"
-    local macos_x64_fw="$TEMP_DIR/osx-x64/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME"
+    # macOS 使用深层目录结构，库文件在 Versions/A/ 目录下
+    local macos_arm64_fw="$TEMP_DIR/osx-arm64/${FRAMEWORK_NAME}.framework/Versions/A/$FRAMEWORK_NAME"
+    local macos_x64_fw="$TEMP_DIR/osx-x64/${FRAMEWORK_NAME}.framework/Versions/A/$FRAMEWORK_NAME"
     local output_dir="$TEMP_DIR/osx-universal/${FRAMEWORK_NAME}.framework"
     
     echo ""
@@ -377,9 +475,10 @@ create_macos_universal_framework() {
         echo "只有一个macOS架构可用，直接使用..."
     else
         echo "合并macOS架构..."
-        lipo -create "${available_libs[@]}" -output "$output_dir/$FRAMEWORK_NAME"
+        # macOS 深层目录结构：库文件在 Versions/A/ 下
+        lipo -create "${available_libs[@]}" -output "$output_dir/Versions/A/$FRAMEWORK_NAME"
         # 更新 install_name
-        install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/$FRAMEWORK_NAME" "$output_dir/$FRAMEWORK_NAME"
+        install_name_tool -id "@rpath/${FRAMEWORK_NAME}.framework/Versions/A/$FRAMEWORK_NAME" "$output_dir/Versions/A/$FRAMEWORK_NAME"
     fi
     
     echo "✅ macOS通用 Framework 创建完成"
@@ -482,35 +581,83 @@ XCODEBUILD_ARGS+=(-output "$XCFRAMEWORK_PATH")
 
 # 执行 xcodebuild
 echo "执行: xcodebuild ${XCODEBUILD_ARGS[*]}"
-xcodebuild "${XCODEBUILD_ARGS[@]}"
+echo ""
 
-# 检查结果
-if [ -d "$XCFRAMEWORK_PATH" ]; then
+# 执行 xcodebuild 并捕获输出
+if ! xcodebuild "${XCODEBUILD_ARGS[@]}" 2>&1; then
     echo ""
-    echo "========================================="
-    echo "✅ XCFramework 创建成功!"
-    echo "========================================="
-    echo ""
-    echo "输出路径: $XCFRAMEWORK_PATH"
-    echo ""
-    echo "XCFramework 结构:"
-    find "$XCFRAMEWORK_PATH" -type f | head -20
-    echo ""
-    
-    # 显示框架信息
-    if [ -f "$XCFRAMEWORK_PATH/Info.plist" ]; then
-        echo "框架信息:"
-        cat "$XCFRAMEWORK_PATH/Info.plist"
-        echo ""
-    fi
-else
-    echo ""
-    echo "❌ XCFramework 创建失败"
-    rm -rf "$TEMP_DIR"
+    echo "❌ xcodebuild 命令执行失败"
+    echo "保留临时目录以便调试: $TEMP_DIR"
     exit 1
 fi
 
+echo ""
+echo "验证 XCFramework 完整性..."
+
+# 检查 XCFramework 目录是否存在
+if [ ! -d "$XCFRAMEWORK_PATH" ]; then
+    echo "❌ XCFramework 目录不存在: $XCFRAMEWORK_PATH"
+    echo "保留临时目录以便调试: $TEMP_DIR"
+    exit 1
+fi
+
+# 检查 Info.plist 是否存在
+if [ ! -f "$XCFRAMEWORK_PATH/Info.plist" ]; then
+    echo "❌ Info.plist 文件缺失"
+    echo "保留临时目录以便调试: $TEMP_DIR"
+    exit 1
+fi
+
+# 验证 XCFramework 内部的 Framework 目录
+EXPECTED_FRAMEWORKS=()
+[ -d "$TEMP_DIR/ios-arm64/${FRAMEWORK_NAME}.framework" ] && EXPECTED_FRAMEWORKS+=("ios-arm64")
+[ -d "$TEMP_DIR/iossimulator-universal/${FRAMEWORK_NAME}.framework" ] && EXPECTED_FRAMEWORKS+=("ios-arm64_x86_64-simulator")
+[ -d "$TEMP_DIR/osx-universal/${FRAMEWORK_NAME}.framework" ] && EXPECTED_FRAMEWORKS+=("macos-arm64_x86_64")
+
+echo "期望的 Framework 目录: ${EXPECTED_FRAMEWORKS[*]}"
+
+MISSING_FRAMEWORKS=()
+for fw_id in "${EXPECTED_FRAMEWORKS[@]}"; do
+    if [ ! -d "$XCFRAMEWORK_PATH/$fw_id" ]; then
+        MISSING_FRAMEWORKS+=("$fw_id")
+    fi
+done
+
+if [ ${#MISSING_FRAMEWORKS[@]} -gt 0 ]; then
+    echo ""
+    echo "❌ XCFramework 不完整，缺少以下 Framework 目录:"
+    for fw_id in "${MISSING_FRAMEWORKS[@]}"; do
+        echo "  - $fw_id/"
+    done
+    echo ""
+    echo "XCFramework 当前内容:"
+    ls -la "$XCFRAMEWORK_PATH/"
+    echo ""
+    echo "保留临时目录以便调试: $TEMP_DIR"
+    exit 1
+fi
+
+echo "✅ XCFramework 完整性验证通过"
+echo ""
+echo "========================================="
+echo "✅ XCFramework 创建成功!"
+echo "========================================="
+echo ""
+echo "输出路径: $XCFRAMEWORK_PATH"
+echo ""
+echo "XCFramework 结构:"
+find "$XCFRAMEWORK_PATH" -type f | head -20
+echo ""
+
+# 显示框架信息
+if [ -f "$XCFRAMEWORK_PATH/Info.plist" ]; then
+    echo "框架信息:"
+    cat "$XCFRAMEWORK_PATH/Info.plist"
+    echo ""
+fi
+
 # 清理临时目录
+echo "清理临时目录..."
 rm -rf "$TEMP_DIR"
 
 echo ""

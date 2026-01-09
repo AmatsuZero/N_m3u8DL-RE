@@ -1,5 +1,0 @@
-module M3U8DownloaderKit_C {
-    umbrella header "M3U8DownloaderKit_C.h"
-    export *
-    module * { export * }
-}

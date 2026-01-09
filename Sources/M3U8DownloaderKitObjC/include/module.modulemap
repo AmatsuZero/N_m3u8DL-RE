@@ -1,0 +1,13 @@
+framework module M3U8DownloaderKit {
+    umbrella header "M3U8DownloaderKit.h"
+    
+    export *
+    module * { export * }
+    
+    // C API（来自 XCFramework）
+    link framework "M3U8DownloaderKit"
+    
+    // 系统库
+    link "z"
+    link "c++"
+}
