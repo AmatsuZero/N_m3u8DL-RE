@@ -4,7 +4,8 @@
 #  M3U8/HLS/DASH 流媒体下载库 - Objective-C 封装层
 #
 #  使用方法:
-#    pod 'M3U8DownloaderKit'
+#    pod 'M3U8DownloaderKit'                  # 基础功能（下载）
+#    pod 'M3U8DownloaderKit/VideoMerge'       # 包含视频合并功能
 #
 #  本地验证:
 #    pod lib lint M3U8DownloaderKit.podspec --allow-warnings
@@ -30,6 +31,7 @@ Pod::Spec.new do |spec|
     - 加密流解密支持
     - 实时下载进度监控
     - 分段下载和合并
+    - 视频片段合并（可选）
     
     支持平台：iOS 15.0+、macOS 12.0+
   DESC
@@ -49,21 +51,8 @@ Pod::Spec.new do |spec|
     :tag => "v#{spec.version}"
   }
   
-  # XCFramework 依赖（包含 .NET NativeAOT 编译的核心库）
-  # 注意：内部 Framework 名称为 M3U8Core，避免与 Pod 库名称冲突
-  spec.vendored_frameworks = "build/xcframework/M3U8Core.xcframework"
-  
-  # Objective-C 源文件
-  spec.source_files = "Sources/M3U8DownloaderKitObjC/**/*.{h,m}"
-  
-  # 公开头文件
-  spec.public_header_files = "Sources/M3U8DownloaderKitObjC/include/*.h"
-  
-  # 框架依赖
-  spec.frameworks = "Foundation", "Security"
-  
-  # 系统库依赖
-  spec.libraries = "z", "c++"
+  # 默认安装Core subspec
+  spec.default_subspecs = 'Core'
   
   # 要求 ARC
   spec.requires_arc = true
@@ -71,22 +60,67 @@ Pod::Spec.new do |spec|
   # 动态框架
   spec.static_framework = false
   
-  # 构建配置
-  spec.pod_target_xcconfig = {
-    # 头文件搜索路径 - 让 ObjC 能找到 C 头文件（m3u8dl.h）
-    "HEADER_SEARCH_PATHS" => [
-      "$(PODS_TARGET_SRCROOT)/Sources/M3U8DownloaderKitObjC/include",
-      "$(PODS_ROOT)/M3U8DownloaderKit/Sources/M3U8DownloaderKitObjC/include"
-    ].join(" "),
-    # Framework 搜索路径 - 找到 XCFramework
-    "FRAMEWORK_SEARCH_PATHS" => "$(PODS_TARGET_SRCROOT)/build/xcframework",
-    # 链接 XCFramework（M3U8Core）
-    "OTHER_LDFLAGS" => "-ObjC -framework M3U8Core"
-  }
+  # ============================================================
+  # Core Subspec - 基础下载功能
+  # ============================================================
+  spec.subspec 'Core' do |core|
+    # XCFramework 依赖（包含 .NET NativeAOT 编译的核心库）
+    core.vendored_frameworks = "build/xcframework/M3U8Core.xcframework"
+    
+    # Objective-C 源文件（不包含VideoMerge）
+    core.source_files = "Sources/M3U8DownloaderKitObjC/*.{h,m}"
+    
+    # 公开头文件
+    core.public_header_files = "Sources/M3U8DownloaderKitObjC/include/*.h"
+    
+    # 框架依赖
+    core.frameworks = "Foundation", "Security"
+    
+    # 系统库依赖
+    core.libraries = "z", "c++"
+    
+    # 构建配置
+    core.pod_target_xcconfig = {
+      # 头文件搜索路径
+      "HEADER_SEARCH_PATHS" => [
+        "$(PODS_TARGET_SRCROOT)/Sources/M3U8DownloaderKitObjC/include",
+        "$(PODS_ROOT)/M3U8DownloaderKit/Sources/M3U8DownloaderKitObjC/include"
+      ].join(" "),
+      # Framework 搜索路径
+      "FRAMEWORK_SEARCH_PATHS" => "$(PODS_TARGET_SRCROOT)/build/xcframework",
+      # 链接 XCFramework
+      "OTHER_LDFLAGS" => "-ObjC -framework M3U8Core"
+    }
+    
+    # 用户构建配置
+    core.user_target_xcconfig = {
+      "FRAMEWORK_SEARCH_PATHS" => "$(PODS_ROOT)/M3U8DownloaderKit/build/xcframework"
+    }
+  end
   
-  # 用户构建配置
-  spec.user_target_xcconfig = {
-    # 确保用户项目能找到 XCFramework
-    "FRAMEWORK_SEARCH_PATHS" => "$(PODS_ROOT)/M3U8DownloaderKit/build/xcframework"
-  }
+  # ============================================================
+  # VideoMerge Subspec - 视频合并功能
+  # ============================================================
+  spec.subspec 'VideoMerge' do |vm|
+    # 依赖Core
+    vm.dependency 'M3U8DownloaderKit/Core'
+    
+    # VideoMerge源文件
+    vm.source_files = "Sources/M3U8DownloaderKitObjC/VideoMerge/**/*.{h,m}"
+    
+    # 公开头文件
+    vm.public_header_files = "Sources/M3U8DownloaderKitObjC/VideoMerge/include/*.h"
+    
+    # 额外的框架依赖
+    vm.frameworks = "AVFoundation", "CoreMedia"
+    
+    # 构建配置
+    vm.pod_target_xcconfig = {
+      # 头文件搜索路径
+      "HEADER_SEARCH_PATHS" => [
+        "$(PODS_TARGET_SRCROOT)/Sources/M3U8DownloaderKitObjC/VideoMerge/include",
+        "$(PODS_ROOT)/M3U8DownloaderKit/Sources/M3U8DownloaderKitObjC/VideoMerge/include"
+      ].join(" ")
+    }
+  end
 end

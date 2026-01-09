@@ -23,10 +23,15 @@ let package = Package(
         .macOS(.v12)
     ],
     products: [
-        // 主要库产品 - Objective-C 实现
+        // 主要库产品 - Objective-C 实现（基础功能）
         .library(
             name: "M3U8DownloaderKit",
             targets: ["M3U8DownloaderKit"]
+        ),
+        // 视频合并模块（可选）
+        .library(
+            name: "M3U8VideoMerge",
+            targets: ["M3U8VideoMerge"]
         ),
     ],
     dependencies: [
@@ -46,6 +51,7 @@ let package = Package(
             name: "M3U8DownloaderKit",
             dependencies: ["M3U8Core"],
             path: "Sources/M3U8DownloaderKitObjC",
+            exclude: ["VideoMerge"],  // 排除VideoMerge目录
             publicHeadersPath: "include",
             cSettings: [
                 .headerSearchPath("include")
@@ -55,6 +61,23 @@ let package = Package(
                 // 系统库
                 .linkedLibrary("z"),
                 .linkedLibrary("c++")
+            ]
+        ),
+        
+        // 视频合并模块（可选）
+        // 基于AVFoundation的视频合并功能
+        .target(
+            name: "M3U8VideoMerge",
+            dependencies: ["M3U8DownloaderKit"],
+            path: "Sources/M3U8DownloaderKitObjC/VideoMerge",
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("include"),
+                .headerSearchPath("../include")  // 访问父模块的头文件
+            ],
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("CoreMedia")
             ]
         ),
         
